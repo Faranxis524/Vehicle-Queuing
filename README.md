@@ -1,8 +1,9 @@
 # Admin Dashboard - PO & Vehicle Monitoring System
+(No revision Yet)
 
 A comprehensive admin dashboard built with React for managing Purchase Orders (PO), Vehicle Monitoring, Driver Information, and real-time updates across multiple devices.
 
-## 🚀 Features
+##  Features
 
 - **PO Monitoring**: Create, view, update, and delete purchase orders with detailed information
 - **Vehicle Monitoring**: Track vehicle information with CRUD operations
@@ -12,7 +13,7 @@ A comprehensive admin dashboard built with React for managing Purchase Orders (P
 - **Mobile Access**: Drivers can log in from phones to update status
 - **Responsive Design**: Works on desktop and mobile devices
 
-## 🛠️ Tech Stack
+##  Tech Stack
 
 - **Frontend**: React.js with React Router
 - **Styling**: CSS3 with modern responsive design
@@ -20,13 +21,13 @@ A comprehensive admin dashboard built with React for managing Purchase Orders (P
 - **Real-time**: Firebase real-time listeners
 - **Deployment**: Ready for Vercel, Netlify, or Firebase Hosting
 
-## 📋 Prerequisites
+##  Prerequisites
 
 - Node.js (v14 or higher)
 - npm or yarn
 - Firebase account (for database)
 
-## 🚀 Quick Start
+##  Quick Start
 
 1. **Clone the repository**
    ```bash
@@ -69,7 +70,7 @@ A comprehensive admin dashboard built with React for managing Purchase Orders (P
 3. Confirm assignments and update vehicle status
 4. Changes sync instantly to admin dashboard
 
-## 🔧 Configuration
+##  Configuration
 
 ### Firebase Setup
 1. Create project at Firebase Console
@@ -96,7 +97,7 @@ A comprehensive admin dashboard built with React for managing Purchase Orders (P
    }
    ```
 
-## 📁 Project Structure
+##  Project Structure
 
 ```
 src/
@@ -113,7 +114,7 @@ src/
 └── index.js                    # App entry point
 ```
 
-## 🌐 Deployment
+##  Deployment
 
 ### For Production:
 1. Build the app: `npm run build`
@@ -127,7 +128,7 @@ REACT_APP_FIREBASE_API_KEY=your_key
 REACT_APP_FIREBASE_PROJECT_ID=your_project
 ```
 
-## 🤝 Contributing
+##  Contributing
 
 1. Fork the repository
 2. Create feature branch: `git checkout -b feature-name`
@@ -135,7 +136,7 @@ REACT_APP_FIREBASE_PROJECT_ID=your_project
 4. Push to branch: `git push origin feature-name`
 5. Create Pull Request
 
-## 📝 License
+##  License
 
 This project is open source and available under the [MIT License](LICENSE).
 
