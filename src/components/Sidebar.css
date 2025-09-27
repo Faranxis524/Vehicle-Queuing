@@ -1,16 +1,24 @@
 .sidebar {
   width: 250px;
   height: 100vh;
-  background-color: #333;
-  color: white;
+  background: linear-gradient(180deg, var(--panel), rgba(185,28,28,0.1)); /* subtle red gradient */
+  color: var(--text, #e5e7eb);
   padding: 20px;
+  padding-bottom: 56px; /* move logout button up a bit from absolute bottom */
+  box-sizing: border-box; /* avoid overflows */
   position: fixed;
   left: 0;
   top: 0;
+  border-right: var(--border, 1px solid rgba(255,255,255,0.08));
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
 }
 
 .sidebar h2 {
   margin-bottom: 20px;
+  color: #fff;
+  letter-spacing: 0.2px;
 }
 
 .sidebar ul {
@@ -23,13 +31,75 @@
 }
 
 .sidebar a {
-  color: white;
+  color: var(--text, #e5e7eb);
   text-decoration: none;
   display: block;
   padding: 10px;
-  border-radius: 4px;
+  border-radius: 8px;
+  transition: background 150ms ease, color 150ms ease;
 }
 
 .sidebar a:hover {
-  background-color: #555;
+  background: rgba(255,255,255,0.06);
+}
+.sidebar-footer {
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: var(--border, 1px solid rgba(255,255,255,0.08));
+}
+
+/* Theme toggle button */
+.theme-toggle {
+  width: calc(100% - 4px);
+  margin: 0 2px 8px 2px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: var(--border, 1px solid rgba(255,255,255,0.14));
+  background: rgba(255,255,255,0.05);
+  color: var(--text, #e5e7eb);
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease, filter 120ms ease, background 120ms ease;
+}
+
+.theme-toggle:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px rgba(0,0,0,0.35);
+  border-color: rgba(255,255,255,0.22);
+  filter: brightness(1.02);
+}
+
+/* Logout button below */
+.logout-btn {
+  width: calc(100% - 4px);
+  margin: 8px 2px 0 2px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: linear-gradient(180deg, #ef4444, #dc2626);
+  color: #fff;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease, filter 120ms ease;
+}
+
+.logout-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px rgba(0,0,0,0.35);
+  border-color: rgba(255,255,255,0.22);
+  filter: brightness(1.02);
+}
+
+/* Light theme refinement for toggle background */
+:root[data-theme='light'] .theme-toggle {
+  background: rgba(0,0,0,0.04);
+  border: 1px solid rgba(0,0,0,0.10);
+  color: #111827;
+}
+
+/* Light theme for sidebar heading */
+:root[data-theme='light'] .sidebar h2 {
+  color: var(--text);
 }

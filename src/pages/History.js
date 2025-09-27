@@ -21,13 +21,24 @@ const History = () => {
   return (
     <div className="history">
       <h1>History</h1>
-      <ul>
-        {history.map((entry, index) => (
-          <li key={index}>
-            {entry.timestamp.toDate().toLocaleString()}: {entry.action} - {entry.details}
-          </li>
-        ))}
-      </ul>
+      <table className="history-table table-elevated">
+        <thead>
+          <tr>
+            <th>Timestamp</th>
+            <th>Action</th>
+            <th>Details</th>
+          </tr>
+        </thead>
+        <tbody>
+          {history.map((entry, index) => (
+            <tr key={index}>
+              <td>{entry.timestamp.toDate().toLocaleString()}</td>
+              <td>{entry.action}</td>
+              <td style={{ whiteSpace: 'pre-line' }}>{entry.details.replace(/, /g, '\n')}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 };

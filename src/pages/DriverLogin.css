@@ -1,5 +1,129 @@
 .driver-login {
-  padding: 20px;
-  max-width: 400px;
-  margin: auto;
+  padding: 24px;
+  max-width: 520px;
+  margin: 40px auto;
+  background: var(--card-bg);
+  border: var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+/* Inputs and selects */
+.driver-login input,
+.driver-login select {
+  appearance: none;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  display: block;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.06);
+  color: var(--text);
+  outline: none;
+  transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+  font-size: 14px;
+  margin-bottom: 10px;
+}
+
+.driver-login input::placeholder {
+  color: rgba(229,231,235,0.5);
+}
+
+.driver-login input:focus,
+.driver-login select:focus {
+  border-color: rgba(255,255,255,0.22);
+  box-shadow: 0 0 0 3px rgba(185,28,28,0.25); /* professional red focus */
+  background: rgba(255,255,255,0.08);
+}
+
+/* Buttons */
+.driver-login button {
+  appearance: none;
+  outline: none;
+  border: var(--border);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  color: var(--text);
+  background: rgba(255,255,255,0.05);
+  cursor: pointer;
+  transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease, border-color 150ms ease;
+  margin-right: 8px;
+}
+
+.driver-login button:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+  border-color: rgba(255,255,255,0.14);
+}
+
+/* Primary action */
+.driver-login button[type="submit"],
+.driver-login .btn-primary {
+  background: linear-gradient(180deg, var(--primary), var(--primary-dark));
+  border: 1px solid rgba(255,255,255,0.18);
+  color: #fff;
+}
+/* Layout and responsive improvements for Driver Login */
+.driver-login h1 {
+  margin-top: 0;
+  margin-bottom: 12px;
+}
+
+.driver-login h2 {
+  margin-top: 8px;
+  margin-bottom: 8px;
+}
+
+.driver-login p {
+  margin: 6px 0;
+}
+
+/* Status row: label, select and button aligned, wraps gracefully */
+.status-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.status-row label {
+  flex: 1 0 100%;
+  margin-bottom: 2px;
+  font-weight: 600;
+}
+
+.status-row select {
+  flex: 1 1 260px;
+  min-width: 200px;
+}
+
+.status-row button {
+  flex: 0 0 auto;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 640px) {
+  .driver-login {
+    margin: 16px;
+    padding: 16px;
+    border-radius: 12px;
+  }
+  .status-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .status-row button {
+    width: 100%;
+  }
+  /* Prevent iOS zoom on focus and improve readability */
+  .driver-login input,
+  .driver-login select {
+    font-size: 16px;
+  }
 }
