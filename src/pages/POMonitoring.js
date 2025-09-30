@@ -55,6 +55,8 @@ const POMonitoring = () => {
         setPos(posData);
 
         // Recompute vehicle loads and assigned POs from Firestore POs (persists across refresh)
+        // Note: currentLoad is now computed as the MAX load scheduled on any single date,
+        // so a vehicle never appears over capacity due to multi-day aggregation.
         setVehicles((prev) => {
           const nameToId = {};
           prev.forEach((v) => {
@@ -62,7 +64,7 @@ const POMonitoring = () => {
           });
           const totals = {};
           prev.forEach((v) => {
-            totals[v.id] = { load: 0, assigned: [] };
+            totals[v.id] = { assigned: [], loadByDate: {} };
           });
 
           posData.forEach((po) => {
@@ -79,15 +81,20 @@ const POMonitoring = () => {
                         ((products[item.product]?.size) || 0)),
                     0
                   );
-            totals[vid].load += poLoad;
+            const d = po.deliveryDate || 'N/A';
+            totals[vid].loadByDate[d] = (totals[vid].loadByDate[d] || 0) + poLoad;
             totals[vid].assigned.push(po.id);
           });
 
-          return prev.map((v) => ({
-            ...v,
-            currentLoad: totals[v.id]?.load || 0,
-            assignedPOs: totals[v.id]?.assigned || []
-          }));
+          return prev.map((v) => {
+            const loads = Object.values(totals[v.id]?.loadByDate || {});
+            const maxLoad = loads.length ? Math.max(...loads) : 0;
+            return {
+              ...v,
+              currentLoad: maxLoad,
+              assignedPOs: totals[v.id]?.assigned || []
+            };
+          });
         });
       },
       (error) => {
@@ -132,44 +139,65 @@ const POMonitoring = () => {
     }, 0);
   };
  
+  // Determine the cluster a vehicle is already servicing on a given date (if any)
+  const getClusterForVehicleOnDate = (vehicle, dateStr) => {
+    const assigned = vehicle.assignedPOs || [];
+    let cluster = null;
+    for (const poId of assigned) {
+      const assignedPO = pos.find(p => p.id === poId);
+      if (assignedPO && assignedPO.deliveryDate === dateStr) {
+        const c = findCluster(assignedPO.location);
+        if (cluster && cluster !== c) {
+          // Mixed clusters shouldn't happen; treat as locked and disallow further mixing.
+          return cluster;
+        }
+        cluster = c;
+      }
+    }
+    return cluster;
+  };
+
   const assignVehicleAutomatically = (po) => {
     const load = calculateLoad(po);
     const clusterName = findCluster(po.location);
- 
-    // Filter by availability and capacity considering the PO's delivery date
+
+    // Filter by availability, capacity for the PO's date, and cluster lock per date
     const eligibleVehicles = vehicles.filter(v => {
       const usedForDate = getUsedLoadForVehicleOnDate(v, po.deliveryDate);
-      return v.ready && (v.capacity - usedForDate) >= load;
+      const clusterForDate = getClusterForVehicleOnDate(v, po.deliveryDate);
+      const hasCapacity = (v.capacity - usedForDate) >= load;
+      const clusterOk = !clusterForDate || clusterForDate === clusterName;
+      return v.ready && hasCapacity && clusterOk;
     });
- 
+
     if (eligibleVehicles.length === 0) return null;
- 
+
     // Rank by:
-    // 1) number of existing POs in same cluster (desc)
+    // 1) number of existing POs in same cluster on the same date (desc)
     // 2) best fit: smallest remaining capacity after assignment for that date (asc)
     const scored = eligibleVehicles.map(v => {
       const clusterMatches = (v.assignedPOs || []).reduce((acc, poId) => {
         const assignedPO = pos.find(p => p.id === poId);
-        return acc + (assignedPO && findCluster(assignedPO.location) === clusterName ? 1 : 0);
+        return acc + (assignedPO && assignedPO.deliveryDate === po.deliveryDate && findCluster(assignedPO.location) === clusterName ? 1 : 0);
       }, 0);
       const usedForDate = getUsedLoadForVehicleOnDate(v, po.deliveryDate);
       const remainingAfter = (v.capacity - usedForDate) - load;
       return { v, clusterMatches, remainingAfter };
     });
- 
+
     scored.sort((a, b) => {
       if (b.clusterMatches !== a.clusterMatches) return b.clusterMatches - a.clusterMatches;
       return a.remainingAfter - b.remainingAfter;
     });
- 
+
     const chosen = scored[0].v;
- 
+
     // Track assignment centrally. We don't flip global ready here; availability is per-date now.
     updateVehicle(chosen.id, {
       currentLoad: chosen.currentLoad + load,
       assignedPOs: [...(chosen.assignedPOs || []), po.id]
     });
- 
+
     return chosen.name;
   };
 
@@ -208,6 +236,14 @@ const POMonitoring = () => {
       };
       // Persist computed load so vehicle load can be reconstructed reliably after refresh
       newPO.load = calculateLoad(newPO);
+
+      // Hard guard: if the order exceeds the capacity of every vehicle, stop and show an error
+      const maxCapacity = Math.max(...vehicles.map(v => v.capacity));
+      if (newPO.load > maxCapacity) {
+        alert('This order exceeds the maximum load capacity of any available vehicle. Please split the order into multiple POs.');
+        return;
+      }
+
       const docRef = await addDoc(collection(db, 'pos'), newPO);
       const poId = docRef.id;
 
@@ -228,7 +264,7 @@ const POMonitoring = () => {
           details: `PO ${newPO.customId} auto-assigned to ${assignedVehicle}`
         });
       } else {
-        alert('No suitable vehicle available for this PO. Please check vehicle availability or adjust the load.');
+        alert('No suitable vehicle available for this PO on the selected delivery date. Vehicles may be full or restricted to another cluster.');
       }
 
       setForm({
@@ -287,6 +323,14 @@ const POMonitoring = () => {
     const vehicle = vehicles.find(v => v.id === vehicleId);
     if (vehicle) {
       const usedForDate = getUsedLoadForVehicleOnDate(vehicle, selectedPO.deliveryDate);
+      const clusterName = findCluster(selectedPO.location);
+      const lockedCluster = getClusterForVehicleOnDate(vehicle, selectedPO.deliveryDate);
+
+      if (lockedCluster && lockedCluster !== clusterName) {
+        alert(`Selected vehicle is already assigned to ${lockedCluster} on ${selectedPO.deliveryDate}. You cannot mix clusters on the same trip.`);
+        return;
+      }
+
       if (vehicle.capacity - usedForDate >= load) {
         // Track assignment; keep global ready unchanged
         updateVehicle(vehicleId, {
@@ -406,9 +450,14 @@ const POMonitoring = () => {
                 <h3>Suitable Vehicles</h3>
                 {(() => {
                   const load = calculateLoad(selectedPO);
+                  const clusterName = findCluster(selectedPO.location);
+                  const maxCapacity = Math.max(...vehicles.map(v => v.capacity));
                   const suitableVehicles = vehicles.filter(vehicle => {
                     const usedForDate = getUsedLoadForVehicleOnDate(vehicle, selectedPO.deliveryDate);
-                    return (vehicle.capacity - usedForDate) >= load;
+                    const lockedCluster = getClusterForVehicleOnDate(vehicle, selectedPO.deliveryDate);
+                    const hasCapacity = (vehicle.capacity - usedForDate) >= load;
+                    const clusterOk = !lockedCluster || lockedCluster === clusterName;
+                    return vehicle.ready && hasCapacity && clusterOk;
                   });
                   return suitableVehicles.length > 0 ? (
                     suitableVehicles.map(vehicle => {
@@ -422,7 +471,13 @@ const POMonitoring = () => {
                       );
                     })
                   ) : (
-                    <p>No suitable vehicles available for the selected delivery date.</p>
+                    load > maxCapacity ? (
+                      <p style={{ color: '#c0392b' }}>
+                        This order exceeds the maximum load capacity of any vehicle. Please split the order into smaller batches.
+                      </p>
+                    ) : (
+                      <p>No suitable vehicles available for the selected delivery date. Vehicles may be full or locked to a different cluster.</p>
+                    )
                   );
                 })()}
               </div>
