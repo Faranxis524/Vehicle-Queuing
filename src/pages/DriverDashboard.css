@@ -1,0 +1,134 @@
+.driver-dashboard {
+  padding: 20px;
+  max-width: 800px;
+  margin: 0 auto;
+  min-height: 100vh;
+}
+
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.dashboard-header h1 {
+  margin: 0;
+  color: var(--text);
+}
+
+.header-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.dashboard-content {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+}
+
+.welcome-card {
+  text-align: center;
+}
+
+.welcome-card h2 {
+  margin-bottom: 10px;
+  color: var(--text);
+}
+
+.welcome-card p {
+  margin: 5px 0;
+  color: var(--muted);
+}
+
+.status-card h3 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  color: var(--text);
+}
+
+.status-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.status-controls label {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.status-controls select {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.06);
+  color: var(--text);
+  outline: none;
+  transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+
+.status-controls select:focus {
+  border-color: rgba(255,255,255,0.22);
+  box-shadow: 0 0 0 3px rgba(185,28,28,0.25);
+  background: rgba(255,255,255,0.08);
+}
+
+/* Select options theming */
+.status-controls select option {
+  background: var(--panel);
+  color: var(--text);
+}
+
+.status-controls button {
+  align-self: flex-start;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .driver-dashboard {
+    padding: 15px;
+  }
+
+  .dashboard-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .header-actions {
+    justify-content: center;
+  }
+
+  .welcome-card {
+    padding: 20px;
+  }
+
+  .status-card {
+    padding: 20px;
+  }
+
+  .status-controls {
+    align-items: stretch;
+  }
+
+  .status-controls button {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .driver-dashboard {
+    padding: 10px;
+  }
+
+  .dashboard-header h1 {
+    font-size: 24px;
+  }
+
+  .welcome-card h2 {
+    font-size: 20px;
+  }
+}

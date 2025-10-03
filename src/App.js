@@ -8,6 +8,7 @@ import VehicleMonitoring from './pages/VehicleMonitoring';
 import History from './pages/History';
 import DriverInfo from './pages/DriverInfo';
 import DriverLogin from './pages/DriverLogin';
+import DriverDashboard from './pages/DriverDashboard';
 import CentralLogin from './pages/CentralLogin';
 import './App.css';
 
@@ -38,6 +39,7 @@ function App() {
             {/* Auth routes (no dashboard shell) */}
             <Route path="/login" element={<CentralLogin />} />
             <Route path="/driver-login" element={<DriverLogin />} />
+            <Route path="/driver-dashboard" element={<DriverDashboard />} />
 
             {/* App routes with dashboard shell */}
             <Route element={<ShellLayout />}>

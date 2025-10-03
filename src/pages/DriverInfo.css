@@ -56,6 +56,12 @@
   background: rgba(0,0,0,0.02);
 }
 
+/* Select options theming */
+.driver-form select option {
+  background: var(--panel);
+  color: var(--text);
+}
+
 /* Form submit button */
 .driver-form button[type="submit"] {
   width: fit-content;

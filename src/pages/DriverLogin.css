@@ -1,6 +1,6 @@
 .driver-login {
   padding: 24px;
-  max-width: 520px;
+  max-width: 400px;
   margin: 40px auto;
   background: var(--card-bg);
   border: var(--border);
@@ -8,140 +8,80 @@
   box-shadow: var(--shadow);
 }
 
-/* Inputs and selects */
-.driver-login input,
-.driver-login select {
-  appearance: none;
-  width: 100%;
-  max-width: 100%;
-  box-sizing: border-box;
-  display: block;
-  padding: 10px 12px;
+.login-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.login-header h1 {
+  margin: 0;
+  color: var(--text);
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.login-form input {
+  padding: 12px 16px;
   border-radius: 10px;
   border: 1px solid rgba(255,255,255,0.14);
   background: rgba(255,255,255,0.06);
   color: var(--text);
   outline: none;
   transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
-  font-size: 14px;
-  margin-bottom: 10px;
+  font-size: 16px;
 }
 
-.driver-login input::placeholder {
+.login-form input::placeholder {
   color: rgba(229,231,235,0.5);
 }
 
-.driver-login input:focus,
-.driver-login select:focus {
-  border-color: rgba(255,255,255,0.22);
-  box-shadow: 0 0 0 3px rgba(185,28,28,0.25); /* professional red focus */
-  background: rgba(255,255,255,0.08);
-}
-
-/* Light theme input styles */
-[data-theme='light'] .driver-login input,
-[data-theme='light'] .driver-login select {
-  border-color: rgba(0,0,0,0.16);
-  background: rgba(0,0,0,0.04);
-}
-
-[data-theme='light'] .driver-login input::placeholder {
+/* Light theme placeholder */
+[data-theme='light'] .login-form input::placeholder {
   color: rgba(0,0,0,0.4);
 }
 
-[data-theme='light'] .driver-login input:focus,
-[data-theme='light'] .driver-login select:focus {
-  border-color: rgba(185,28,28,0.4);
-  box-shadow: 0 0 0 3px rgba(185,28,28,0.15);
-  background: rgba(0,0,0,0.02);
+.login-form input:focus {
+  border-color: rgba(255,255,255,0.22);
+  box-shadow: 0 0 0 3px rgba(185,28,28,0.25);
+  background: rgba(255,255,255,0.08);
 }
 
-/* Buttons */
-.driver-login button {
-  appearance: none;
-  outline: none;
-  border: var(--border);
+.login-form button {
+  padding: 12px 16px;
   border-radius: 10px;
-  padding: 8px 12px;
-  font-size: 12px;
+  border: none;
+  background: linear-gradient(180deg, var(--primary), var(--primary-dark));
+  color: #fff;
   font-weight: 600;
-  letter-spacing: 0.2px;
-  color: var(--text);
-  background: rgba(255,255,255,0.05);
   cursor: pointer;
-  transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease, border-color 150ms ease;
-  margin-right: 8px;
+  transition: transform 150ms ease, box-shadow 150ms ease;
 }
 
-.driver-login button:hover {
+.login-form button:hover {
   transform: translateY(-1px);
   box-shadow: var(--shadow);
-  border-color: rgba(255,255,255,0.14);
-}
-
-/* Primary action */
-.driver-login button[type="submit"],
-.driver-login .btn-primary {
-  background: linear-gradient(180deg, var(--primary), var(--primary-dark));
-  border: 1px solid rgba(255,255,255,0.18);
-  color: #fff;
-}
-/* Layout and responsive improvements for Driver Login */
-.driver-login h1 {
-  margin-top: 0;
-  margin-bottom: 12px;
-}
-
-.driver-login h2 {
-  margin-top: 8px;
-  margin-bottom: 8px;
-}
-
-.driver-login p {
-  margin: 6px 0;
-}
-
-/* Status row: label, select and button aligned, wraps gracefully */
-.status-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  align-items: center;
-  margin-top: 12px;
-}
-
-.status-row label {
-  flex: 1 0 100%;
-  margin-bottom: 2px;
-  font-weight: 600;
-}
-
-.status-row select {
-  flex: 1 1 260px;
-  min-width: 200px;
-}
-
-.status-row button {
-  flex: 0 0 auto;
 }
 
 /* Mobile responsiveness */
-@media (max-width: 640px) {
+@media (max-width: 480px) {
   .driver-login {
-    margin: 16px;
-    padding: 16px;
-    border-radius: 12px;
+    margin: 20px;
+    padding: 20px;
   }
-  .status-row {
+
+  .login-header {
     flex-direction: column;
-    align-items: stretch;
+    gap: 10px;
+    text-align: center;
   }
-  .status-row button {
-    width: 100%;
-  }
-  /* Prevent iOS zoom on focus and improve readability */
-  .driver-login input,
-  .driver-login select {
-    font-size: 16px;
+
+  .login-header h1 {
+    font-size: 24px;
   }
 }
