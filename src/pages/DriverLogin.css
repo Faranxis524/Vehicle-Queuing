@@ -38,6 +38,24 @@
   background: rgba(255,255,255,0.08);
 }
 
+/* Light theme input styles */
+[data-theme='light'] .driver-login input,
+[data-theme='light'] .driver-login select {
+  border-color: rgba(0,0,0,0.16);
+  background: rgba(0,0,0,0.04);
+}
+
+[data-theme='light'] .driver-login input::placeholder {
+  color: rgba(0,0,0,0.4);
+}
+
+[data-theme='light'] .driver-login input:focus,
+[data-theme='light'] .driver-login select:focus {
+  border-color: rgba(185,28,28,0.4);
+  box-shadow: 0 0 0 3px rgba(185,28,28,0.15);
+  background: rgba(0,0,0,0.02);
+}
+
 /* Buttons */
 .driver-login button {
   appearance: none;

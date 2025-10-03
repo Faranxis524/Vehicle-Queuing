@@ -35,14 +35,14 @@
 }
 
 .modal-content {
-  background-color: #ffffff;
-  color: #1f2937; /* dark text for readability on white */
+  background: var(--panel);
+  color: var(--text);
   padding: 20px;
   border-radius: 12px;
   max-width: 640px;
   width: 100%;
-  border: 1px solid #e5e7eb;
-  box-shadow: 0 20px 48px rgba(0,0,0,0.35);
+  border: var(--border);
+  box-shadow: var(--shadow);
 }
 
 .add-po-btn {
@@ -77,7 +77,7 @@
 .form-modal h2 {
   margin-top: 0;
   margin-bottom: 20px;
-  color: #333;
+  color: var(--text);
 }
 
 .form-buttons {
@@ -136,34 +136,56 @@
 .po-form label {
   font-size: 13px;
   font-weight: 600;
-  color: #374151; /* dark gray on white modal */
+  color: var(--text);
 }
 
 .po-form input,
 .po-form select {
-  appearance: none;
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
+  display: block;
   padding: 10px 12px;
   border-radius: 10px;
-  border: 1px solid #d1d5db;
-  background: #f9fafb;
-  color: #111827;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.06);
+  color: var(--text);
   outline: none;
   transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
   font-size: 14px;
 }
 
+.po-form input::placeholder {
+  color: rgba(229,231,235,0.5);
+}
+
 .po-form input:focus,
 .po-form select:focus {
-  border-color: var(--primary);
+  border-color: rgba(255,255,255,0.22);
+  box-shadow: 0 0 0 3px rgba(185,28,28,0.25); /* professional red focus */
+  background: rgba(255,255,255,0.08);
+}
+
+/* Light theme input styles */
+[data-theme='light'] .po-form input,
+[data-theme='light'] .po-form select {
+  border-color: rgba(0,0,0,0.16);
+  background: rgba(0,0,0,0.04);
+}
+
+[data-theme='light'] .po-form input::placeholder {
+  color: rgba(0,0,0,0.4);
+}
+
+[data-theme='light'] .po-form input:focus,
+[data-theme='light'] .po-form select:focus {
+  border-color: rgba(185,28,28,0.4);
   box-shadow: 0 0 0 3px rgba(185,28,28,0.15);
-  background: #ffffff;
+  background: rgba(0,0,0,0.02);
 }
 
 .po-form .products-section h4 {
-  color: #111827;
+  color: var(--text);
   margin: 10px 0 6px;
 }
 
@@ -234,14 +256,14 @@
   border-color: rgba(255,255,255,0.14);
 }
 
-/* Improve white modal readability and depth */
+/* Improve modal readability and depth */
 .modal-content h2 {
-  color: #111827;
+  color: var(--text);
   margin-top: 0;
 }
 
 .modal-content p {
-  color: #374151;
+  color: var(--muted);
 }
 
 /* Make select caret visible on light background (WebKit) */

@@ -13,25 +13,47 @@
 /* Form fields */
 .driver-form input,
 .driver-form select {
-  appearance: none;
   width: 100%;
   max-width: 480px;
   box-sizing: border-box;
+  display: block;
   padding: 10px 12px;
   border-radius: 10px;
-  border: 1px solid #d1d5db;
-  background: #f9fafb;
-  color: #111827;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.06);
+  color: var(--text);
   outline: none;
   transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
   font-size: 14px;
 }
 
+.driver-form input::placeholder {
+  color: rgba(229,231,235,0.5);
+}
+
 .driver-form input:focus,
 .driver-form select:focus {
-  border-color: var(--primary);
+  border-color: rgba(255,255,255,0.22);
+  box-shadow: 0 0 0 3px rgba(185,28,28,0.25);
+  background: rgba(255,255,255,0.08);
+}
+
+/* Light theme input styles */
+[data-theme='light'] .driver-form input,
+[data-theme='light'] .driver-form select {
+  border-color: rgba(0,0,0,0.16);
+  background: rgba(0,0,0,0.04);
+}
+
+[data-theme='light'] .driver-form input::placeholder {
+  color: rgba(0,0,0,0.4);
+}
+
+[data-theme='light'] .driver-form input:focus,
+[data-theme='light'] .driver-form select:focus {
+  border-color: rgba(185,28,28,0.4);
   box-shadow: 0 0 0 3px rgba(185,28,28,0.15);
-  background: #ffffff;
+  background: rgba(0,0,0,0.02);
 }
 
 /* Form submit button */
@@ -52,8 +74,9 @@
 }
 
 .driver-card {
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
+  background: var(--panel);
+  border: var(--border);
   border-radius: 12px;
   padding: 14px;
+  box-shadow: var(--shadow);
 }
