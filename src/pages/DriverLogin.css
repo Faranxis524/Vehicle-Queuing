@@ -41,11 +41,6 @@
   color: rgba(229,231,235,0.5);
 }
 
-/* Light theme placeholder */
-[data-theme='light'] .login-form input::placeholder {
-  color: rgba(0,0,0,0.4);
-}
-
 .login-form input:focus {
   border-color: rgba(255,255,255,0.22);
   box-shadow: 0 0 0 3px rgba(185,28,28,0.25);

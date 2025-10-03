@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { collection, onSnapshot, query, orderBy, doc, updateDoc, addDoc, getDocs } from 'firebase/firestore';
+import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db } from '../firebase';
 import { useVehicles } from '../contexts/VehicleContext';
 import './DriverDashboard.css';
@@ -7,6 +8,7 @@ import './DriverDashboard.css';
 const DriverDashboard = () => {
   const { vehicles, setVehicleReadyByName } = useVehicles();
   const [drivers, setDrivers] = useState([]);
+  const [pos, setPos] = useState([]);
   const [loggedInDriver, setLoggedInDriver] = useState(null);
   const [status, setStatus] = useState('');
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
@@ -50,6 +52,17 @@ const DriverDashboard = () => {
     });
     return unsubscribe;
   }, [vehicles]);
+  useEffect(() => {
+    const q = query(collection(db, 'pos'), orderBy('createdAt'));
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const posData = [];
+      querySnapshot.forEach((doc) => {
+        posData.push({ id: doc.id, ...doc.data() });
+      });
+      setPos(posData);
+    });
+    return unsubscribe;
+  }, []);
 
   // Assume driver is passed via props or context, for now use localStorage or something
   useEffect(() => {
@@ -59,9 +72,35 @@ const DriverDashboard = () => {
       if (driver) {
         setLoggedInDriver(driver);
         setStatus(driver.status);
+        console.log('Driver logged in:', driver.name, 'Vehicle:', driver.vehicle);
+      } else {
+        console.log('Driver not found in drivers list:', driverName);
       }
     }
   }, [drivers]);
+
+  // Debug: Log POs and filtering
+  useEffect(() => {
+    if (loggedInDriver && pos.length > 0) {
+      const assignedPOs = pos.filter(po => po.assignedDriver === loggedInDriver.name);
+      console.log('=== DRIVER DASHBOARD DEBUG ===');
+      console.log('Logged in driver:', loggedInDriver.name);
+      console.log('Driver vehicle:', loggedInDriver.vehicle);
+      console.log('Total POs in system:', pos.length);
+      console.log('POs with assignedDriver field:', pos.filter(po => po.assignedDriver).length);
+      console.log('POs assigned to this driver:', assignedPOs.length);
+      console.log('All POs with assignedDriver:', pos.filter(po => po.assignedDriver).map(po => ({
+        id: po.id,
+        customId: po.customId,
+        assignedDriver: po.assignedDriver,
+        assignedTruck: po.assignedTruck
+      })));
+      console.log('POs that should show for this driver:', pos.filter(po =>
+        po.assignedDriver === loggedInDriver.name ||
+        po.assignedTruck === loggedInDriver.vehicle
+      ).map(po => ({ id: po.id, customId: po.customId, assignedDriver: po.assignedDriver, assignedTruck: po.assignedTruck })));
+    }
+  }, [loggedInDriver, pos]);
 
   const handleConfirm = async () => {
     let driverDocId = loggedInDriver.id;
@@ -134,6 +173,31 @@ const DriverDashboard = () => {
     window.location.href = '/driver-login';
   };
 
+  const updateDeliveryStatus = async (poId, newStatus) => {
+    await updateDoc(doc(db, 'pos', poId), { deliveryStatus: newStatus });
+    await addDoc(collection(db, 'history'), {
+      timestamp: new Date(),
+      action: 'Updated Delivery Status',
+      details: `PO ${pos.find(p => p.id === poId).customId} status updated to ${newStatus} by ${loggedInDriver.name}`
+    });
+  };
+
+  const handlePhotoUpload = async (e, poId) => {
+    const file = e.target.files[0];
+    if (file) {
+      const storage = getStorage();
+      const storageRef = ref(storage, `delivery-photos/${poId}/${file.name}`);
+      await uploadBytes(storageRef, file);
+      const downloadURL = await getDownloadURL(storageRef);
+      await updateDoc(doc(db, 'pos', poId), { deliveryPhoto: downloadURL });
+      await addDoc(collection(db, 'history'), {
+        timestamp: new Date(),
+        action: 'Uploaded Delivery Photo',
+        details: `Photo uploaded for PO ${pos.find(p => p.id === poId).customId} by ${loggedInDriver.name}`
+      });
+    }
+  };
+
   if (!loggedInDriver) {
     return <div>Loading...</div>;
   }
@@ -179,9 +243,43 @@ const DriverDashboard = () => {
             </button>
           </div>
         </div>
+
+        <div className="assigned-pos card">
+          <h3>Assigned Purchase Orders</h3>
+          {pos.length === 0 ? (
+            <p>No POs found in the system.</p>
+          ) : pos.filter(po => po.assignedDriver === loggedInDriver.name || po.assignedTruck === loggedInDriver.vehicle).length === 0 ? (
+            <p>No POs assigned to you yet. Check back later or contact your supervisor.</p>
+          ) : (
+            <div className="pos-list">
+              {pos.filter(po => po.assignedDriver === loggedInDriver.name || po.assignedTruck === loggedInDriver.vehicle).map(po => (
+                <div key={po.id} className="po-card">
+                  <h4>PO {po.customId}</h4>
+                  <p>Company: {po.companyName}</p>
+                  <p>Delivery Date: {po.deliveryDate}</p>
+                  <p>Status: {po.deliveryStatus || 'pending'}</p>
+                  {po.deliveryPhoto && <img src={po.deliveryPhoto} alt="Delivery" style={{ maxWidth: '100px' }} />}
+                  <div className="po-actions">
+                    {po.deliveryStatus !== 'done' && (
+                      <>
+                        <button className="btn" onClick={() => updateDeliveryStatus(po.id, po.deliveryStatus === 'pending' ? 'departure' : po.deliveryStatus === 'departure' ? 'ongoing' : 'done')}>
+                          {po.deliveryStatus === 'pending' ? 'Mark as Departed' : po.deliveryStatus === 'departure' ? 'Mark as Ongoing' : 'Mark as Done'}
+                        </button>
+                        {po.deliveryStatus === 'done' && (
+                          <input type="file" accept="image/*" onChange={(e) => handlePhotoUpload(e, po.id)} />
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
+
 };
 
 export default DriverDashboard;

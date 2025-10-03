@@ -27,6 +27,7 @@ const allLocations = Object.values(clusters).flatMap(cluster => cluster.location
 const POMonitoring = () => {
   const { vehicles, updateVehicle, assignLoad, setVehicles } = useVehicles();
   const [pos, setPos] = useState([]);
+  const [drivers, setDrivers] = useState([]);
   const [form, setForm] = useState({
     poNumber: '',
     companyName: '',
@@ -44,6 +45,15 @@ const POMonitoring = () => {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    const qDrivers = query(collection(db, 'drivers'), orderBy('createdAt'));
+    const unsubscribeDrivers = onSnapshot(qDrivers, (querySnapshot) => {
+      const driversData = [];
+      querySnapshot.forEach((doc) => {
+        driversData.push({ id: doc.id, ...doc.data() });
+      });
+      setDrivers(driversData);
+    });
+
     const q = query(collection(db, 'pos'), orderBy('createdAt'));
     const unsubscribe = onSnapshot(
       q,
@@ -102,7 +112,10 @@ const POMonitoring = () => {
         alert('Failed to load POs. Please refresh the page.');
       }
     );
-    return unsubscribe;
+    return () => {
+      unsubscribeDrivers();
+      unsubscribe();
+    };
   }, [setVehicles]);
 
   const handleInputChange = (e) => {
@@ -247,23 +260,53 @@ const POMonitoring = () => {
       const docRef = await addDoc(collection(db, 'pos'), newPO);
       const poId = docRef.id;
 
-      // Automate assignment
+      // Auto-assign vehicle and driver based on availability
       const assignedVehicle = assignVehicleAutomatically({ ...newPO, id: poId });
       if (assignedVehicle) {
-        // Keep Firestore field naming as 'assignedTruck' for backward compatibility
-        // Also persist computed load so vehicle loads can be reconstructed after refresh
-        await updateDoc(docRef, { assignedTruck: assignedVehicle, load: newPO.load });
-        newPO.assignedTruck = assignedVehicle;
+        // Find the driver assigned to this vehicle
+        const vehicle = vehicles.find(v => v.name === assignedVehicle);
+        const driver = vehicle ? drivers.find(d => d.vehicle === vehicle.name && d.name === vehicle.driver) : null;
 
-        // assignedPOs and currentLoad already updated via VehicleContext.assignLoad
+        console.log('=== PO ASSIGNMENT DEBUG ===');
+        console.log('Assigned vehicle:', assignedVehicle);
+        console.log('Vehicle found:', vehicle ? vehicle.name : 'No vehicle found');
+        console.log('Driver found:', driver ? driver.name : 'No driver found');
+        console.log('Vehicle driver:', vehicle ? vehicle.driver : 'No vehicle driver');
 
-        // Log assignment
-        await addDoc(collection(db, 'history'), {
-          timestamp: new Date(),
-          action: 'Auto-Assigned PO to Vehicle',
-          details: `PO ${newPO.customId} auto-assigned to ${assignedVehicle}`
-        });
+        if (driver) {
+          // Update PO with both vehicle and driver assignment
+          await updateDoc(docRef, {
+            assignedTruck: assignedVehicle,
+            assignedDriver: driver.name,
+            load: newPO.load
+          });
+          newPO.assignedTruck = assignedVehicle;
+          newPO.assignedDriver = driver.name;
+
+          console.log('PO assigned to driver:', driver.name, 'and vehicle:', assignedVehicle);
+
+          // Log assignment
+          await addDoc(collection(db, 'history'), {
+            timestamp: new Date(),
+            action: 'Auto-Assigned PO to Driver/Vehicle',
+            details: `PO ${newPO.customId} auto-assigned to driver ${driver.name} and vehicle ${assignedVehicle}`
+          });
+        } else {
+          // Fallback: just assign vehicle if no driver found
+          await updateDoc(docRef, { assignedTruck: assignedVehicle, load: newPO.load });
+          newPO.assignedTruck = assignedVehicle;
+
+          console.log('PO assigned to vehicle only:', assignedVehicle);
+
+          // Log assignment
+          await addDoc(collection(db, 'history'), {
+            timestamp: new Date(),
+            action: 'Auto-Assigned PO to Vehicle',
+            details: `PO ${newPO.customId} auto-assigned to ${assignedVehicle}`
+          });
+        }
       } else {
+        console.log('No suitable vehicle found for PO:', newPO.customId);
         alert('No suitable vehicle available for this PO on the selected delivery date. Vehicles may be full or restricted to another cluster.');
       }
 
@@ -338,7 +381,11 @@ const POMonitoring = () => {
           assignedPOs: [...(vehicle.assignedPOs || []), selectedPO.id]
         });
         // Update PO assignedTruck (field kept for compatibility) and persist computed load
-        await updateDoc(doc(db, 'pos', selectedPO.id), { assignedTruck: vehicle.name, load: calculateLoad(selectedPO) });
+        console.log('=== MANUAL ASSIGNMENT DEBUG ===');
+        console.log('Vehicle:', vehicle.name);
+        console.log('Vehicle driver:', vehicle.driver);
+        await updateDoc(doc(db, 'pos', selectedPO.id), { assignedTruck: vehicle.name, assignedDriver: vehicle.driver, load: calculateLoad(selectedPO) });
+        console.log('PO manually assigned to driver:', vehicle.driver);
         setSelectedPO({ ...selectedPO, assignedTruck: vehicle.name });
         // Log to history
         await addDoc(collection(db, 'history'), {
@@ -415,9 +462,9 @@ const POMonitoring = () => {
                   <div className="card-title">PO {po.customId}</div>
                   <div className="card-subtitle">{po.companyName}</div>
                 </div>
-                <div className={`badge ${assigned ? 'success' : 'warning'}`}>
+                <div className={`badge ${po.deliveryStatus === 'confirmed' ? 'success' : po.deliveryStatus === 'done' ? 'info' : po.deliveryStatus === 'ongoing' ? 'warning' : po.deliveryStatus === 'departure' ? 'secondary' : assigned ? 'success' : 'warning'}`}>
                   <span className="dot"></span>
-                  {assigned ? 'Assigned' : 'Pending'}
+                  {po.deliveryStatus === 'confirmed' ? 'Delivered' : po.deliveryStatus === 'done' ? 'Awaiting Confirmation' : po.deliveryStatus === 'ongoing' ? 'In Transit' : po.deliveryStatus === 'departure' ? 'Departed' : assigned ? 'Assigned' : 'Pending'}
                 </div>
               </div>
               <div className="card-meta">Delivery: {po.deliveryDate}</div>
@@ -444,7 +491,21 @@ const POMonitoring = () => {
               ))}
             </div>
             <p>Total Price: {selectedPO.totalPrice.toLocaleString()}</p>
+            <p>Assigned Driver: {selectedPO.assignedDriver || 'None'}</p>
             <p>Assigned Vehicle: {selectedPO.assignedTruck || 'None'}</p>
+            <p>Delivery Status: {selectedPO.deliveryStatus || 'pending'}</p>
+            {selectedPO.deliveryPhoto && <img src={selectedPO.deliveryPhoto} alt="Delivery Photo" style={{ maxWidth: '200px' }} />}
+            {selectedPO.deliveryStatus === 'done' && (
+              <button onClick={async () => {
+                await updateDoc(doc(db, 'pos', selectedPO.id), { deliveryStatus: 'confirmed' });
+                setSelectedPO({ ...selectedPO, deliveryStatus: 'confirmed' });
+                await addDoc(collection(db, 'history'), {
+                  timestamp: new Date(),
+                  action: 'Confirmed Delivery',
+                  details: `PO ${selectedPO.customId} delivery confirmed by admin`
+                });
+              }}>Confirm Delivery</button>
+            )}
             {!selectedPO.assignedTruck && (
               <div>
                 <h3>Suitable Vehicles</h3>

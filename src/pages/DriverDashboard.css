@@ -77,12 +77,6 @@
   background: rgba(255,255,255,0.08);
 }
 
-/* Select options theming */
-.status-controls select option {
-  background: var(--panel);
-  color: var(--text);
-}
-
 .status-controls button {
   align-self: flex-start;
 }

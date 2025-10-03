@@ -8,7 +8,6 @@ const DriverLogin = () => {
   const { vehicles } = useVehicles();
   const [drivers, setDrivers] = useState([]);
   const [loginName, setLoginName] = useState('');
-  const [password, setPassword] = useState('');
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
 
   useEffect(() => {
@@ -52,17 +51,23 @@ const DriverLogin = () => {
     return unsubscribe;
   }, [vehicles]);
 
-  // Prefill loginName from centralized login redirect (?name=...)
+  // Prefill loginName from centralized login redirect (?name=...) and auto-login when drivers have loaded
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const name = params.get('name');
     if (name) setLoginName(name);
   }, []);
-  const handleLogin = () => {
-    if (password !== 'password') {
-      alert('Invalid password');
-      return;
+
+  useEffect(() => {
+    if (loginName && drivers.length > 0) {
+      const driver = drivers.find(d => d.name.toLowerCase() === loginName.toLowerCase());
+      if (driver) {
+        localStorage.setItem('loggedInDriver', driver.name);
+        window.location.href = '/driver-dashboard';
+      }
     }
+  }, [drivers, loginName]);
+  const handleLogin = () => {
     const driver = drivers.find(d => d.name.toLowerCase() === loginName.toLowerCase());
     if (driver) {
       localStorage.setItem('loggedInDriver', driver.name);
@@ -86,12 +91,6 @@ const DriverLogin = () => {
           placeholder="Enter Driver Name"
           value={loginName}
           onChange={(e) => setLoginName(e.target.value)}
-        />
-        <input
-          type="password"
-          placeholder="Enter Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
           onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
         />
         <button className="btn btn-primary" onClick={handleLogin}>Login</button>

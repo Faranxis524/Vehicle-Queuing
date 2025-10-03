@@ -269,9 +269,3 @@
 /* Make select caret visible on light background (WebKit) */
 .po-form select::-ms-expand { display: none; }
 .po-form input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(20%); }
-
-/* Select options theming */
-.po-form select option {
-  background: var(--panel);
-  color: var(--text);
-}
