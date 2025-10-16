@@ -1,11 +1,37 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { db } from '../firebase';
 import { useVehicles } from '../contexts/VehicleContext';
 import './VehicleMonitoring.css';
 
 const VehicleMonitoring = () => {
-  const { vehicles } = useVehicles();
+  const { vehicles, setVehicles } = useVehicles();
   const [selectedVehicle, setSelectedVehicle] = useState(null);
   const [showModal, setShowModal] = useState(false);
+
+  // Listen for real-time updates from Firestore trucks collection
+  useEffect(() => {
+    const q = query(collection(db, 'trucks'), orderBy('createdAt'));
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const trucksData = [];
+      querySnapshot.forEach((doc) => {
+        trucksData.push({ id: doc.id, ...doc.data() });
+      });
+
+      // Update vehicle ready status in context based on Firestore data
+      setVehicles(prevVehicles =>
+        prevVehicles.map(vehicle => {
+          const truckData = trucksData.find(truck => truck.name === vehicle.name);
+          if (truckData) {
+            return { ...vehicle, ready: truckData.ready };
+          }
+          return vehicle;
+        })
+      );
+    });
+
+    return unsubscribe;
+  }, [setVehicles]);
 
 
   return (
@@ -55,6 +81,7 @@ const VehicleMonitoring = () => {
             <p>Current Load: {selectedVehicle.currentLoad.toLocaleString()} cm²</p>
             <p>Remaining Capacity: {(selectedVehicle.capacity - selectedVehicle.currentLoad).toLocaleString()} cm²</p>
             <p>Status: {selectedVehicle.ready ? 'Available' : 'In Use'}</p>
+            <p>Driver Status: {selectedVehicle.status || 'Not Set'}</p>
             <button onClick={() => setShowModal(false)}>Close</button>
           </div>
         </div>
