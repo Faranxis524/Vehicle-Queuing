@@ -9,10 +9,12 @@ const VehicleMonitoring = () => {
   const [selectedVehicle, setSelectedVehicle] = useState(null);
   const [showModal, setShowModal] = useState(false);
 
-  // Listen for real-time updates from Firestore trucks collection
+  // Listen for real-time updates from Firestore trucks collection and drivers collection
   useEffect(() => {
-    const q = query(collection(db, 'trucks'), orderBy('createdAt'));
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+    const trucksQuery = query(collection(db, 'trucks'), orderBy('createdAt'));
+    const driversQuery = query(collection(db, 'drivers'), orderBy('createdAt'));
+
+    const unsubscribeTrucks = onSnapshot(trucksQuery, (querySnapshot) => {
       const trucksData = [];
       querySnapshot.forEach((doc) => {
         trucksData.push({ id: doc.id, ...doc.data() });
@@ -30,7 +32,28 @@ const VehicleMonitoring = () => {
       );
     });
 
-    return unsubscribe;
+    const unsubscribeDrivers = onSnapshot(driversQuery, (querySnapshot) => {
+      const driversData = [];
+      querySnapshot.forEach((doc) => {
+        driversData.push({ id: doc.id, ...doc.data() });
+      });
+
+      // Update vehicle driver status in context based on Firestore data
+      setVehicles(prevVehicles =>
+        prevVehicles.map(vehicle => {
+          const driverData = driversData.find(driver => driver.name === vehicle.driver);
+          if (driverData) {
+            return { ...vehicle, status: driverData.status || 'Not Set' };
+          }
+          return vehicle;
+        })
+      );
+    });
+
+    return () => {
+      unsubscribeTrucks();
+      unsubscribeDrivers();
+    };
   }, [setVehicles]);
 
 
@@ -55,12 +78,13 @@ const VehicleMonitoring = () => {
                   <div className="card-title">{vehicle.name}</div>
                   <div className="card-subtitle">Plate: {vehicle.plateNumber}</div>
                 </div>
-                <div className={`badge ${vehicle.ready ? 'success' : 'warning'}`}>
+                <div className={`badge ${vehicle.ready && vehicle.status === 'Available' ? 'success' : 'warning'}`}>
                   <span className="dot"></span>
-                  {vehicle.ready ? 'Available' : 'In Use'}
+                  {vehicle.ready && vehicle.status === 'Available' ? 'Available' : 'Unavailable'}
                 </div>
               </div>
               <div className="card-meta">Driver: {vehicle.driver}</div>
+              <div className="card-meta">Status: {vehicle.status || 'Not Set'}</div>
               <div className="progress" aria-label="Load utilization">
                 <span style={{ width: `${pct}%` }} />
               </div>
@@ -80,8 +104,9 @@ const VehicleMonitoring = () => {
             <p>Capacity: {selectedVehicle.capacity.toLocaleString()} cm²</p>
             <p>Current Load: {selectedVehicle.currentLoad.toLocaleString()} cm²</p>
             <p>Remaining Capacity: {(selectedVehicle.capacity - selectedVehicle.currentLoad).toLocaleString()} cm²</p>
-            <p>Status: {selectedVehicle.ready ? 'Available' : 'In Use'}</p>
+            <p>Status: {selectedVehicle.ready && selectedVehicle.status === 'Available' ? 'Available' : 'Unavailable'}</p>
             <p>Driver Status: {selectedVehicle.status || 'Not Set'}</p>
+            <p>Vehicle Ready: {selectedVehicle.ready ? 'Yes' : 'No'}</p>
             <button onClick={() => setShowModal(false)}>Close</button>
           </div>
         </div>
