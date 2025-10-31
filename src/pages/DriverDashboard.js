@@ -5,6 +5,47 @@ import { db } from '../firebase';
 import { useVehicles } from '../contexts/VehicleContext';
 import './DriverDashboard.css';
 
+const products = {
+  'Interfolded': {
+    size: 70780.5,
+    packaging: { type: 'case', quantity: 30, name: 'Case (30 pcs)' },
+    pricing: {
+      perPiece: { price: 26, unit: 'piece', capacity: 0 },
+      perPackage: { price: 780, unit: 'case' }
+    }
+  },
+  'Jumbo Roll': {
+    size: 66816,
+    packaging: [
+      { type: 'case', quantity: 12, name: 'Case (12 rolls)' },
+      { type: 'case', quantity: 16, name: 'Case (16 rolls)' }
+    ],
+    pricing: {
+      perPiece: { price: 51, unit: 'roll', capacity: 0 },
+      perPackage: [
+        { price: 612, unit: 'case', quantity: 12 },
+        { price: 816, unit: 'case', quantity: 16 }
+      ]
+    }
+  },
+  'Bathroom': {
+    size: 45630,
+    packaging: { type: 'bundle', quantity: 48, name: 'Bundle (48 rolls)' },
+    pricing: {
+      perPiece: { price: 8.15, unit: 'roll', capacity: 0 },
+      perPackage: { price: 408, unit: 'bundle' }
+    }
+  },
+  'Hand Roll': {
+    size: 46200,
+    packaging: { type: 'bundle', quantity: 6, name: 'Bundle (6 rolls)' },
+    pricing: {
+      perPiece: { price: 134, unit: 'roll', capacity: 0 },
+      perPackage: { price: 804, unit: 'bundle' }
+    }
+  }
+};
+
 const DriverDashboard = () => {
   const { vehicles, setVehicleReadyByName } = useVehicles();
   const [drivers, setDrivers] = useState([]);
@@ -12,6 +53,8 @@ const DriverDashboard = () => {
   const [loggedInDriver, setLoggedInDriver] = useState(null);
   const [status, setStatus] = useState('');
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
+  const [selectedPO, setSelectedPO] = useState(null);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
 
   useEffect(() => {
     const value = theme === 'light' ? 'light' : 'dark';
@@ -128,44 +171,71 @@ const DriverDashboard = () => {
   };
 
   const handleStatusUpdate = async () => {
-    // Ensure we have a persistent driver document (create if derived from vehicles)
-    let driverDocId = loggedInDriver.id;
-    if (!driverDocId || String(driverDocId).startsWith('veh-')) {
-      const newDocRef = await addDoc(collection(db, 'drivers'), {
-        name: loggedInDriver.name,
-        vehicle: loggedInDriver.vehicle,
-        confirmed: !!loggedInDriver.confirmed,
-        status,
-        createdAt: new Date()
-      });
-      driverDocId = newDocRef.id;
-      setLoggedInDriver({ ...loggedInDriver, id: driverDocId, status });
-    } else {
-      await updateDoc(doc(db, 'drivers', driverDocId), { status });
-      setLoggedInDriver({ ...loggedInDriver, status });
-    }
-
-    // Update vehicle ready status based on driver status
-    const vehicleReady = status === 'Available';
-
-    // Mirror to local context for immediate UI responsiveness
-    setVehicleReadyByName(loggedInDriver.vehicle, vehicleReady);
-
-    // Persist to Firestore (kept collection name 'trucks' for backward compatibility)
-    const trucksQuery = query(collection(db, 'trucks'));
-    const trucksSnapshot = await getDocs(trucksQuery);
-    trucksSnapshot.forEach(async (truckDoc) => {
-      if (truckDoc.data().name === loggedInDriver.vehicle) {
-        await updateDoc(doc(db, 'trucks', truckDoc.id), { ready: vehicleReady });
+    setUpdatingStatus(true);
+    try {
+      // Ensure we have a persistent driver document (create if derived from vehicles)
+      let driverDocId = loggedInDriver.id;
+      if (!driverDocId || String(driverDocId).startsWith('veh-')) {
+        const newDocRef = await addDoc(collection(db, 'drivers'), {
+          name: loggedInDriver.name,
+          vehicle: loggedInDriver.vehicle,
+          confirmed: !!loggedInDriver.confirmed,
+          status,
+          createdAt: new Date()
+        });
+        driverDocId = newDocRef.id;
+        setLoggedInDriver({ ...loggedInDriver, id: driverDocId, status });
+      } else {
+        await updateDoc(doc(db, 'drivers', driverDocId), { status });
+        setLoggedInDriver({ ...loggedInDriver, status });
       }
-    });
 
-    // Log to history
-    await addDoc(collection(db, 'history'), {
-      timestamp: new Date(),
-      action: 'Status Updated',
-      details: `Driver ${loggedInDriver.name} set status to ${status}, vehicle ${loggedInDriver.vehicle} ready: ${vehicleReady}`
-    });
+      // Update vehicle ready status based on driver status
+      const vehicleReady = status === 'Available';
+
+      // Mirror to local context for immediate UI responsiveness
+      setVehicleReadyByName(loggedInDriver.vehicle, vehicleReady);
+
+      // Persist to Firestore (kept collection name 'trucks' for backward compatibility)
+      const trucksQuery = query(collection(db, 'trucks'));
+      const trucksSnapshot = await getDocs(trucksQuery);
+      trucksSnapshot.forEach(async (truckDoc) => {
+        if (truckDoc.data().name === loggedInDriver.vehicle) {
+          await updateDoc(doc(db, 'trucks', truckDoc.id), { ready: vehicleReady });
+        }
+      });
+
+      // If driver becomes available, automatically update PO statuses from on-hold to assigned
+      if (status === 'Available') {
+        const vehicle = vehicles.find(v => v.name === loggedInDriver.vehicle);
+        if (vehicle) {
+          const onHoldPOs = pos.filter(po => po.assignedTruck === loggedInDriver.vehicle && po.status === 'on-hold');
+          for (const po of onHoldPOs) {
+            await updateDoc(doc(db, 'pos', po.id), { status: 'assigned' });
+            await addDoc(collection(db, 'history'), {
+              timestamp: new Date(),
+              action: 'PO Status Auto-Updated',
+              details: `PO ${po.customId} status changed from on-hold to assigned - driver ${loggedInDriver.name} became available`
+            });
+          }
+        }
+      }
+
+      // Log to history
+      await addDoc(collection(db, 'history'), {
+        timestamp: new Date(),
+        action: 'Status Updated',
+        details: `Driver ${loggedInDriver.name} set status to ${status}, vehicle ${loggedInDriver.vehicle} ready: ${vehicleReady}`
+      });
+
+      // Show success feedback
+      alert(`Status updated to ${status} successfully!`);
+    } catch (error) {
+      console.error('Status update failed:', error);
+      alert('Failed to update status. Please try again.');
+    } finally {
+      setUpdatingStatus(false);
+    }
   };
 
   const handleLogout = () => {
@@ -174,11 +244,24 @@ const DriverDashboard = () => {
   };
 
   const updateDeliveryStatus = async (poId, newStatus) => {
-    await updateDoc(doc(db, 'pos', poId), { deliveryStatus: newStatus });
+    const po = pos.find(p => p.id === poId);
+    if (newStatus === 'done') {
+      // Move completed PO to history collection
+      await addDoc(collection(db, 'completed-pos'), {
+        ...po,
+        completedAt: new Date(),
+        completedBy: loggedInDriver.name
+      });
+      // Remove from active POs
+      await updateDoc(doc(db, 'pos', poId), { status: 'completed', deliveryStatus: newStatus });
+    } else {
+      await updateDoc(doc(db, 'pos', poId), { deliveryStatus: newStatus });
+    }
+
     await addDoc(collection(db, 'history'), {
       timestamp: new Date(),
-      action: 'Updated Delivery Status',
-      details: `PO ${pos.find(p => p.id === poId).customId} status updated to ${newStatus} by ${loggedInDriver.name}`
+      action: newStatus === 'done' ? 'PO Completed and Moved to History' : 'Updated Delivery Status',
+      details: `PO ${po.customId} status updated to ${newStatus} by ${loggedInDriver.name}`
     });
   };
 
@@ -238,8 +321,12 @@ const DriverDashboard = () => {
               <option value="Unavailable">Unavailable</option>
               <option value="Under Maintenance">Under Maintenance</option>
             </select>
-            <button className="btn btn-primary" onClick={handleStatusUpdate}>
-              Update Status
+            <button
+              className={`btn btn-primary status-${status?.toLowerCase().replace(' ', '-') || 'not-set'} ${updatingStatus ? 'updating' : ''}`}
+              onClick={handleStatusUpdate}
+              disabled={updatingStatus}
+            >
+              {updatingStatus ? 'Updating...' : 'Update Status'}
             </button>
           </div>
         </div>
@@ -251,24 +338,38 @@ const DriverDashboard = () => {
           ) : pos.filter(po => po.assignedDriver === loggedInDriver.name || po.assignedTruck === loggedInDriver.vehicle).length === 0 ? (
             <p>No POs assigned to you yet. Check back later or contact your supervisor.</p>
           ) : (
-            <div className="pos-list">
+            <div className="pos-grid">
               {pos.filter(po => po.assignedDriver === loggedInDriver.name || po.assignedTruck === loggedInDriver.vehicle).map(po => (
-                <div key={po.id} className="po-card">
-                  <h4>PO {po.customId}</h4>
-                  <p>Company: {po.companyName}</p>
-                  <p>Delivery Date: {po.deliveryDate}</p>
-                  <p>Status: {po.deliveryStatus || 'pending'}</p>
-                  {po.deliveryPhoto && <img src={po.deliveryPhoto} alt="Delivery" style={{ maxWidth: '100px' }} />}
+                <div key={po.id} className="po-card driver-po-card" onClick={() => setSelectedPO(po)}>
+                  <div className="po-header">
+                    <span className="po-number">PO {po.customId}</span>
+                    <span className={`po-status ${po.deliveryStatus || 'pending'}`}>{po.deliveryStatus || 'pending'}</span>
+                  </div>
+                  <div className="po-summary">
+                    <p><strong>{po.companyName}</strong></p>
+                    <p>{po.customerName}</p>
+                    <p>{po.location}</p>
+                    <p>{po.deliveryDate}</p>
+                    <p><strong>Load: {po.load ? po.load.toLocaleString() : '0'} cm²</strong></p>
+                  </div>
                   <div className="po-actions">
                     {po.deliveryStatus !== 'done' && (
-                      <>
-                        <button className="btn" onClick={() => updateDeliveryStatus(po.id, po.deliveryStatus === 'pending' ? 'departure' : po.deliveryStatus === 'departure' ? 'ongoing' : 'done')}>
-                          {po.deliveryStatus === 'pending' ? 'Mark as Departed' : po.deliveryStatus === 'departure' ? 'Mark as Ongoing' : 'Mark as Done'}
-                        </button>
-                        {po.deliveryStatus === 'done' && (
-                          <input type="file" accept="image/*" onChange={(e) => handlePhotoUpload(e, po.id)} />
-                        )}
-                      </>
+                      <button
+                        className="btn btn-small btn-primary"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const nextStatus = po.deliveryStatus === 'pending' ? 'departure' : po.deliveryStatus === 'departure' ? 'ongoing' : 'done';
+                          if (nextStatus === 'done') {
+                            if (window.confirm('Warning: Marking this PO as done cannot be undone and will move it to History. Continue?')) {
+                              updateDeliveryStatus(po.id, nextStatus);
+                            }
+                          } else {
+                            updateDeliveryStatus(po.id, nextStatus);
+                          }
+                        }}
+                      >
+                        {po.deliveryStatus === 'pending' ? 'Depart' : po.deliveryStatus === 'departure' ? 'Ongoing' : 'Mark as Done'}
+                      </button>
                     )}
                   </div>
                 </div>
@@ -277,6 +378,135 @@ const DriverDashboard = () => {
           )}
         </div>
       </div>
+
+      {selectedPO && (
+        <div className="modal">
+          <div className="modal-content po-detail-modal">
+            <div className="modal-header">
+              <h2>Purchase Order {selectedPO.customId}</h2>
+            </div>
+
+            <div className="info-grid">
+              <div className="info-box vendor-info">
+                <h3>Vendor Information</h3>
+                <div className="vendor-details">
+                  <p><strong>HILTAC MANUFACTURING AND TRADING, INC.</strong></p>
+                  <p>10000014896 GATCHALIAN SUBDIVISION</p>
+                  <p>BRGY. BANAYBANAY, CABUYAO</p>
+                  <p>PH</p>
+                  <p>Telephone: 09175168415</p>
+                  <p>Email: tristan@hiltac.com</p>
+                </div>
+              </div>
+
+              <div className="info-box delivery-info">
+                <h3>Delivery</h3>
+                <div className="delivery-details">
+                  <p><strong>Requested date:</strong> {selectedPO.deliveryDate}</p>
+                  <p><strong>{selectedPO.customerName}</strong></p>
+                  <p>{selectedPO.address || 'Address not provided'}</p>
+                  <p><strong>Status:</strong> {selectedPO.deliveryStatus || 'pending'}</p>
+                </div>
+              </div>
+
+              <div className="info-box po-details">
+                <h3>Purchase Order Details</h3>
+                <div className="po-details-content">
+                  <p><strong>Requisitioner:</strong> {selectedPO.customerName}</p>
+                  <p><strong>Order:</strong> {selectedPO.customId}</p>
+                  <p><strong>Date:</strong> {selectedPO.poDate}</p>
+                  <p><strong>Contact:</strong> {selectedPO.contact || 'Not provided'}</p>
+                </div>
+              </div>
+
+              <div className="info-box billing-info">
+                <h3>Billing Information</h3>
+                <div className="billing-details">
+                  <p>{selectedPO.address || 'Address not provided'}</p>
+                  <p>PH</p>
+                  <p><strong>Phone:</strong> {selectedPO.phone || 'Not provided'}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="products-table-section">
+              <h3>Order Items</h3>
+              <table className="products-table">
+                <thead>
+                  <tr>
+                    <th>Item</th>
+                    <th>Description</th>
+                    <th>External Code</th>
+                    <th>Quantity</th>
+                    <th>Unit</th>
+                    <th>Delivery</th>
+                    <th>Price</th>
+                    <th>Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedPO.products.map((item, index) => {
+                    const product = products[item.product];
+                    let price = 0;
+                    let unit = 'PCS';
+
+                    if (product) {
+                      if (item.pricingType === 'perPiece') {
+                        price = product.pricing.perPiece.price;
+                        unit = product.pricing.perPiece.unit.toUpperCase();
+                      } else if (item.pricingType === 'perPackage') {
+                        if (Array.isArray(product.pricing.perPackage)) {
+                          const selectedPackage = product.pricing.perPackage.find(p => p.quantity === item.packageQuantity);
+                          price = selectedPackage ? selectedPackage.price : product.pricing.perPackage[0].price;
+                        } else {
+                          price = product.pricing.perPackage.price;
+                        }
+                        unit = Array.isArray(product.packaging) ? 'CASE' : product.packaging.type.toUpperCase();
+                      }
+                    }
+
+                    return (
+                      <tr key={index}>
+                        <td>{index + 1}</td>
+                        <td>{item.product}</td>
+                        <td>-</td>
+                        <td>{item.quantity}</td>
+                        <td>{unit}</td>
+                        <td>{selectedPO.deliveryDate}</td>
+                        <td>₱{price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        <td>₱{(item.quantity * price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="summary-section">
+              <div className="summary-left">
+                <p><strong>Currency:</strong> {selectedPO.currency || 'PHP'}</p>
+                <p><strong>Terms of payment:</strong> {selectedPO.termsOfPayment || 'Not specified'}</p>
+              </div>
+              <div className="summary-right">
+                <p><strong>Subtotal:</strong> ₱{selectedPO.totalPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                <p><strong>Sales tax (12%):</strong> ₱{(selectedPO.totalPrice * 0.12).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                <p><strong>Total amount:</strong> ₱{(selectedPO.totalPrice * 1.12).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+              </div>
+            </div>
+
+            {selectedPO.deliveryPhoto && (
+              <div className="delivery-photo-section">
+                <h3>Delivery Photo</h3>
+                <img src={selectedPO.deliveryPhoto} alt="Delivery" style={{ maxWidth: '400px', maxHeight: '400px' }} />
+              </div>
+            )}
+
+            <div className="modal-actions">
+              <button onClick={() => setSelectedPO(null)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 

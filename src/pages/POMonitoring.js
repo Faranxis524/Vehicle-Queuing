@@ -5,22 +5,81 @@ import { useVehicles } from '../contexts/VehicleContext';
 import './POMonitoring.css';
 
 const products = {
-  'Jumbo Roll Tissue': { size: 66816, price: 5000 },
-  'Hand Roll Tissue': { size: 46200, price: 7500 },
-  'Interfolded Paper Towel': { size: 70780.5, price: 10000 },
-  'Bathroom Tissue': { size: 45630, price: 12500 }
+  'Interfolded': {
+    size: 0, // Individual piece dimension = 0
+    packaging: { type: 'case', quantity: 30, name: 'Case (30 pcs)', size: 70780.5 },
+    pricing: {
+      perPiece: { price: 26, unit: 'piece' },
+      perPackage: { price: 780, unit: 'case' }
+    }
+  },
+  'Jumbo Roll': {
+    size: 0, // Individual roll dimension = 0
+    packaging: [
+      { type: 'case', quantity: 12, name: 'Case (12 rolls)', size: 66816 },
+      { type: 'case', quantity: 16, name: 'Case (16 rolls)', size: 66816 }
+    ],
+    pricing: {
+      perPiece: { price: 51, unit: 'roll' },
+      perPackage: [
+        { price: 612, unit: 'case', quantity: 12 },
+        { price: 816, unit: 'case', quantity: 16 }
+      ]
+    }
+  },
+  'Bathroom': {
+    size: 0, // Individual roll dimension = 0
+    packaging: { type: 'bundle', quantity: 48, name: 'Bundle (48 rolls)', size: 45630 },
+    pricing: {
+      perPiece: { price: 8.15, unit: 'roll' },
+      perPackage: { price: 408, unit: 'bundle' }
+    }
+  },
+  'Hand Roll': {
+    size: 0, // Individual roll dimension = 0
+    packaging: { type: 'bundle', quantity: 6, name: 'Bundle (6 rolls)', size: 46200 },
+    pricing: {
+      perPiece: { price: 134, unit: 'roll' },
+      perPackage: { price: 804, unit: 'bundle' }
+    }
+  }
+};
+
+const customers = {
+  'Sisko': ['Pampanga', 'Bulacan', 'BGC Taguig', 'Quezon City', 'Makati', 'Alabang', 'Calamba', 'Lipa'],
+  'Sudexo': ['Bulacan', 'BGC Taguig', 'Quezon City', 'Makati', 'Alabang', 'Calamba', 'Lipa'],
+  'John\'s Lang': ['BGC Taguig', 'Quezon City', 'Makati', 'Alabang', 'Calamba', 'Lipa'],
+  'WeWork': ['Uptown', 'RCBC', 'Menarco', 'Milestone'],
+  'China Bank': ['Makati', 'Binondo', 'Mega Town'],
+  'Tata Consultant Service Philippine Inc.': ['Bench Taguig', 'Entech Pampanga', 'Panorama BGC Taguig'],
+  'VXI Global Philippines': ['Entech Pampanga', 'Bridgetown Quezon City', 'Makati', 'MOA', 'Panorama BGC Taguig']
 };
 
 const clusters = {
   'Cluster 1': {
-    locations: ['Location 1', 'Location 2', 'Location 3']
+    locations: ['Pampanga', 'Bulacan']
   },
   'Cluster 2': {
-    locations: ['Location 4', 'Location 5', 'Location 6']
+    locations: ['Quezon City', 'Bridgetown Quezon City', 'Binondo', 'Mega Town']
+  },
+  'Cluster 3': {
+    locations: ['Makati', 'BGC Taguig', 'Panorama BGC Taguig', 'Bench Taguig', 'Uptown', 'Menarco', 'Milestone', 'MOA', 'Alabang']
+  },
+  'Cluster 4': {
+    locations: ['Alabang', 'Calamba', 'Lipa']
   }
 };
 
 const allLocations = Object.values(clusters).flatMap(cluster => cluster.locations);
+
+// Get all unique locations from customers
+const allCustomerLocations = [...new Set(Object.values(customers).flatMap(locations => locations))];
+
+// Verify all customer locations are in clusters
+const missingLocations = allCustomerLocations.filter(loc => !allLocations.includes(loc));
+if (missingLocations.length > 0) {
+  console.warn('Warning: The following customer locations are not assigned to any cluster:', missingLocations);
+}
 
 
 
@@ -42,7 +101,6 @@ const POMonitoring = () => {
     phone: '',
     currency: 'PHP',
     termsOfPayment: '',
-    salesTax: 0,
     status: 'pending'
   });
   const [showForm, setShowForm] = useState(false);
@@ -64,7 +122,6 @@ const POMonitoring = () => {
     phone: '',
     currency: 'PHP',
     termsOfPayment: '',
-    salesTax: 0,
     status: 'pending'
   });
 
@@ -77,7 +134,8 @@ const POMonitoring = () => {
         querySnapshot.forEach((doc) => {
           posData.push({ id: doc.id, customId: doc.data().customId, ...doc.data() });
         });
-        setPos(posData);
+        // Filter out completed POs from the main display
+        setPos(posData.filter(po => po.status !== 'completed'));
 
         // Recompute vehicle loads and assigned POs from Firestore POs (persists across refresh)
         // Note: currentLoad is now computed as the MAX load scheduled on any single date,
@@ -218,15 +276,64 @@ const POMonitoring = () => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setForm({ ...form, [name]: value });
+    if (name === 'companyName') {
+      // When company changes, reset location if it's not in the new company's locations
+      const newForm = { ...form, [name]: value };
+      if (value && customers[value] && !customers[value].includes(form.location)) {
+        newForm.location = '';
+      }
+      setForm(newForm);
+    } else {
+      setForm({ ...form, [name]: value });
+    }
   };
 
   const calculateLoad = useCallback((po) => {
-    return po.products.reduce((total, item) => total + (item.quantity * (products[item.product]?.size || 0)), 0);
+    return po.products.reduce((total, item) => {
+      const product = products[item.product];
+      if (!product) return total;
+
+      let itemSize = 0;
+
+      // Use package dimensions for load calculation
+      if (item.pricingType === 'perPackage') {
+        const packaging = product.packaging;
+        if (Array.isArray(packaging)) {
+          // For Jumbo Roll with multiple packaging options, use the selected one
+          const selectedPackaging = packaging.find(p => p.quantity === item.packageQuantity) || packaging[0];
+          itemSize = selectedPackaging.size;
+        } else {
+          itemSize = packaging.size;
+        }
+      } else if (item.pricingType === 'perPiece') {
+        // Individual pieces have 0 dimension
+        itemSize = product.size; // This is 0
+      }
+
+      return total + (item.quantity * itemSize);
+    }, 0);
   }, []);
 
   const calculateTotalPrice = useCallback((productsList) => {
-    return productsList.reduce((total, item) => total + (item.quantity * (products[item.product]?.price || 0)), 0);
+    return productsList.reduce((total, item) => {
+      const product = products[item.product];
+      if (!product) return total;
+
+      let price = 0;
+      if (item.pricingType === 'perPiece') {
+        price = product.pricing.perPiece.price;
+      } else if (item.pricingType === 'perPackage') {
+        if (Array.isArray(product.pricing.perPackage)) {
+          // For Jumbo Roll with multiple packaging options
+          const selectedPackage = product.pricing.perPackage.find(p => p.quantity === item.packageQuantity);
+          price = selectedPackage ? selectedPackage.price : product.pricing.perPackage[0].price;
+        } else {
+          price = product.pricing.perPackage.price;
+        }
+      }
+
+      return total + (item.quantity * price);
+    }, 0);
   }, []);
 
   const findCluster = (location) => {
@@ -397,51 +504,70 @@ const POMonitoring = () => {
     });
 
     // Track assignment centrally. We don't flip global ready here; availability is per-date now.
+    // Ensure we don't exceed 100% capacity
+    const usedForDate = getUsedLoadForVehicleOnDate(chosen, po.deliveryDate);
+    const newLoad = Math.min(usedForDate + load, chosen.capacity);
+
     updateVehicle(chosen.id, {
-      currentLoad: chosen.currentLoad + load,
+      currentLoad: newLoad,
       assignedPOs: [...(chosen.assignedPOs || []), po.id]
     });
 
     return chosen.name;
-  }, [scoreVehiclesForPO, vehicles, pos, calculateLoad]);
+  }, [scoreVehiclesForPO, vehicles, pos, calculateLoad, getUsedLoadForVehicleOnDate]);
 
   const removeProduct = (index) => {
     const updatedProducts = form.products.filter((_, i) => i !== index);
-    setForm({ ...form, products: updatedProducts, totalPrice: calculateTotalPrice(updatedProducts) });
+    const subtotal = calculateTotalPrice(updatedProducts);
+    setForm({ ...form, products: updatedProducts, totalPrice: subtotal });
   };
 
   const handleQuantityChange = (index, value) => {
     const updatedProducts = form.products.map((item, i) => i === index ? { ...item, quantity: parseInt(value) || 0 } : item);
-    setForm({ ...form, products: updatedProducts, totalPrice: calculateTotalPrice(updatedProducts) });
+    const subtotal = calculateTotalPrice(updatedProducts);
+    setForm({ ...form, products: updatedProducts, totalPrice: subtotal });
   };
 
   const handleEditInputChange = (e) => {
     const { name, value } = e.target;
-    setEditForm({ ...editForm, [name]: value });
+    if (name === 'companyName') {
+      // When company changes, reset location if it's not in the new company's locations
+      const newEditForm = { ...editForm, [name]: value };
+      if (value && customers[value] && !customers[value].includes(editForm.location)) {
+        newEditForm.location = '';
+      }
+      setEditForm(newEditForm);
+    } else {
+      setEditForm({ ...editForm, [name]: value });
+    }
   };
 
   const handleEditQuantityChange = (index, value) => {
     const updatedProducts = editForm.products.map((item, i) => i === index ? { ...item, quantity: parseInt(value) || 0 } : item);
-    setEditForm({ ...editForm, products: updatedProducts, totalPrice: calculateTotalPrice(updatedProducts) });
+    const subtotal = calculateTotalPrice(updatedProducts);
+    setEditForm({ ...editForm, products: updatedProducts, totalPrice: subtotal });
   };
 
   const handleEditProductChange = (index, value) => {
-    const updatedProducts = editForm.products.map((item, i) => i === index ? { ...item, product: value } : item);
-    setEditForm({ ...editForm, products: updatedProducts, totalPrice: calculateTotalPrice(updatedProducts) });
+    const updatedProducts = editForm.products.map((item, i) => i === index ? { ...item, product: value, pricingType: 'perPiece', packageQuantity: null } : item);
+    const subtotal = calculateTotalPrice(updatedProducts);
+    setEditForm({ ...editForm, products: updatedProducts, totalPrice: subtotal });
   };
 
   const addEditProduct = () => {
-    const updatedProducts = [...editForm.products, { product: 'Jumbo Roll Tissue', quantity: 0 }];
-    setEditForm({ ...editForm, products: updatedProducts, totalPrice: calculateTotalPrice(updatedProducts) });
+    const updatedProducts = [...editForm.products, { product: 'Interfolded', quantity: 0, pricingType: 'perPiece', packageQuantity: null }];
+    const subtotal = calculateTotalPrice(updatedProducts);
+    setEditForm({ ...editForm, products: updatedProducts, totalPrice: subtotal });
   };
 
   const removeEditProduct = (index) => {
     const updatedProducts = editForm.products.filter((_, i) => i !== index);
-    setEditForm({ ...editForm, products: updatedProducts, totalPrice: calculateTotalPrice(updatedProducts) });
+    const subtotal = calculateTotalPrice(updatedProducts);
+    setEditForm({ ...editForm, products: updatedProducts, totalPrice: subtotal });
   };
 
   const handleSaveUpdate = async () => {
-    if (!editForm.poNumber || !editForm.companyName || !editForm.customerName || !editForm.poDate || !editForm.location || !editForm.deliveryDate || !editForm.address || editForm.products.length === 0 || editForm.products.some(p => !p.product || p.quantity <= 0)) {
+    if (!editForm.poNumber || !editForm.companyName || !editForm.customerName || !editForm.poDate || !editForm.location || !editForm.deliveryDate || !editForm.address || editForm.products.length === 0 || editForm.products.some(p => !p.product || p.quantity <= 0 || !p.pricingType)) {
       alert('Please fill all required fields with valid data.');
       return;
     }
@@ -475,7 +601,7 @@ const POMonitoring = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.poNumber || !form.companyName || !form.customerName || !form.poDate || !form.location || !form.deliveryDate || !form.address || form.products.length === 0 || form.products.some(p => !p.product || p.quantity <= 0)) {
+    if (!form.poNumber || !form.companyName || !form.customerName || !form.poDate || !form.location || !form.deliveryDate || !form.address || form.products.length === 0 || form.products.some(p => !p.product || p.quantity <= 0 || !p.pricingType)) {
       alert('Please fill all required fields with valid data.');
       return;
     }
@@ -572,7 +698,6 @@ const POMonitoring = () => {
         phone: '',
         currency: 'PHP',
         termsOfPayment: '',
-        salesTax: 0,
         status: 'pending'
       });
       setShowForm(false);
@@ -612,7 +737,6 @@ const POMonitoring = () => {
       phone: selectedPO.phone || '',
       currency: selectedPO.currency || 'PHP',
       termsOfPayment: selectedPO.termsOfPayment || '',
-      salesTax: selectedPO.salesTax || 0,
       status: selectedPO.status || 'pending'
     });
     setIsEditing(true);
@@ -647,36 +771,63 @@ const POMonitoring = () => {
   // Load rebalancing function to optimize existing assignments
   const rebalanceLoads = useCallback(async () => {
     if (window.confirm('This will attempt to rebalance vehicle loads for better distribution. Continue?')) {
-      const unassignedPOs = pos.filter(po => !po.assignedTruck);
-      const reassignedPOs = [];
+      const allPOs = [...pos];
+      const vehicleAssignments = {};
 
-      // First, unassign all POs to start fresh
-      for (const po of pos) {
+      // Initialize vehicle assignments
+      vehicles.forEach(vehicle => {
+        vehicleAssignments[vehicle.name] = {
+          vehicle,
+          assignedPOs: [],
+          totalLoad: 0
+        };
+      });
+
+      // Clear all current assignments first
+      for (const po of allPOs) {
         if (po.assignedTruck) {
           const vehicle = vehicles.find(v => v.name === po.assignedTruck);
           if (vehicle) {
             updateVehicle(vehicle.id, {
-              currentLoad: Math.max(0, vehicle.currentLoad - calculateLoad(po)),
-              assignedPOs: (vehicle.assignedPOs || []).filter(poId => poId !== po.id)
+              currentLoad: 0,
+              assignedPOs: []
             });
           }
-          reassignedPOs.push({ ...po, assignedTruck: null });
         }
       }
 
+      // Sort POs by delivery date and load (largest first for better packing)
+      allPOs.sort((a, b) => {
+        if (a.deliveryDate !== b.deliveryDate) {
+          return new Date(a.deliveryDate) - new Date(b.deliveryDate);
+        }
+        return calculateLoad(b) - calculateLoad(a);
+      });
+
       // Reassign all POs using optimized algorithm
-      const allPOsToAssign = [...reassignedPOs, ...unassignedPOs];
-      for (const po of allPOsToAssign) {
-        const assignedVehicle = assignVehicleAutomatically(po);
+      for (const po of allPOs) {
+        const assignedVehicle = assignVehicleAutomatically({ ...po, assignedTruck: null });
         if (assignedVehicle) {
+          vehicleAssignments[assignedVehicle].assignedPOs.push(po);
+          vehicleAssignments[assignedVehicle].totalLoad += calculateLoad(po);
+
           await updateDoc(doc(db, 'pos', po.id), {
             assignedTruck: assignedVehicle,
-            load: calculateLoad(po)
+            load: calculateLoad(po),
+            status: 'assigned'
           });
+
           await addDoc(collection(db, 'history'), {
             timestamp: new Date(),
             action: 'Rebalanced PO Assignment',
             details: `PO ${po.customId} re-assigned to ${assignedVehicle}`
+          });
+        } else {
+          // If no vehicle available, set to on-hold
+          await updateDoc(doc(db, 'pos', po.id), {
+            assignedTruck: null,
+            status: 'on-hold',
+            load: calculateLoad(po)
           });
         }
       }
@@ -722,8 +873,12 @@ const POMonitoring = () => {
         }
 
         // Track assignment; keep global ready unchanged
+        // Ensure we don't exceed 100% capacity
+        const usedForDate = getUsedLoadForVehicleOnDate(vehicle, selectedPO.deliveryDate);
+        const newLoad = Math.min(usedForDate + load, vehicle.capacity);
+
         updateVehicle(vehicleId, {
-          currentLoad: vehicle.currentLoad + load,
+          currentLoad: newLoad,
           assignedPOs: [...(vehicle.assignedPOs || []), selectedPO.id]
         });
         // Update PO assignedTruck (field kept for compatibility), status, and persist computed load
@@ -766,7 +921,12 @@ const POMonitoring = () => {
                   </div>
                   <div className="input-group">
                     <label>Company Name</label>
-                    <input name="companyName" placeholder="Enter Company Name" value={form.companyName} onChange={handleInputChange} required />
+                    <select name="companyName" value={form.companyName} onChange={handleInputChange} required>
+                      <option value="">Select Company</option>
+                      {Object.keys(customers).map(company => (
+                        <option key={company} value={company}>{company}</option>
+                      ))}
+                    </select>
                   </div>
                   <div className="input-group">
                     <label>Customer Name</label>
@@ -796,9 +956,15 @@ const POMonitoring = () => {
                     <label>Location</label>
                     <select name="location" value={form.location} onChange={handleInputChange} required>
                       <option value="">Select Location</option>
-                      {allLocations.map(loc => (
-                        <option key={loc} value={loc}>{loc}</option>
-                      ))}
+                      {form.companyName && customers[form.companyName] ? (
+                        customers[form.companyName].map(loc => (
+                          <option key={loc} value={loc}>{loc}</option>
+                        ))
+                      ) : (
+                        allLocations.map(loc => (
+                          <option key={loc} value={loc}>{loc}</option>
+                        ))
+                      )}
                     </select>
                   </div>
                   <div className="input-group">
@@ -813,93 +979,219 @@ const POMonitoring = () => {
                     <label>Terms of Payment</label>
                     <input name="termsOfPayment" placeholder="e.g., Net 30 days" value={form.termsOfPayment} onChange={handleInputChange} />
                   </div>
-                  <div className="input-group">
-                    <label>Sales Tax (₱)</label>
-                    <input name="salesTax" type="number" placeholder="0" value={form.salesTax} onChange={handleInputChange} />
-                  </div>
                 </div>
               </div>
 
               <div className="kiosk-section">
                 <h3>Select Products</h3>
                 <div className="product-selection">
-                  {Object.entries(products).map(([productName, productInfo]) => (
-                    <div key={productName} className="product-card">
-                      <div className="product-info">
-                        <h4>{productName}</h4>
-                        <p className="product-price">₱{productInfo.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                        <p className="product-size">Size: {productInfo.size.toLocaleString()} cm³</p>
-                      </div>
-                      <div className="quantity-controls">
-                        <button
-                          type="button"
-                          className="qty-btn minus"
-                          onClick={() => {
-                            const existingIndex = form.products.findIndex(p => p.product === productName);
-                            if (existingIndex >= 0) {
-                              const currentQty = form.products[existingIndex].quantity;
-                              if (currentQty > 1) {
-                                handleQuantityChange(existingIndex, (currentQty - 1).toString());
-                              } else {
-                                removeProduct(existingIndex);
-                              }
-                            }
-                          }}
-                        >
-                          -
-                        </button>
-                        <input
-                          type="number"
-                          className="quantity-input"
-                          min="0"
-                          value={form.products.find(p => p.product === productName)?.quantity || 0}
-                          onChange={(e) => {
-                            const value = parseInt(e.target.value) || 0;
-                            const existingIndex = form.products.findIndex(p => p.product === productName);
-                            if (existingIndex >= 0) {
-                              if (value > 0) {
-                                handleQuantityChange(existingIndex, value.toString());
-                              } else {
-                                removeProduct(existingIndex);
-                              }
-                            } else if (value > 0) {
-                              const updatedProducts = [...form.products, { product: productName, quantity: value }];
-                              setForm({ ...form, products: updatedProducts, totalPrice: calculateTotalPrice(updatedProducts) });
-                            }
-                          }}
-                        />
-                        <button
-                          type="button"
-                          className="qty-btn plus"
-                          onClick={() => {
-                            const existingIndex = form.products.findIndex(p => p.product === productName);
-                            if (existingIndex >= 0) {
-                              const currentQty = form.products[existingIndex].quantity;
-                              handleQuantityChange(existingIndex, (currentQty + 1).toString());
-                            } else {
-                              const updatedProducts = [...form.products, { product: productName, quantity: 1 }];
-                              setForm({ ...form, products: updatedProducts, totalPrice: calculateTotalPrice(updatedProducts) });
-                            }
-                          }}
-                        >
-                          +
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                 {Object.entries(products).map(([productName, productInfo]) => (
+                   <div key={productName} className="product-card">
+                     <div className="product-info">
+                       <h4>{productName}</h4>
+                       <p className="product-size">
+                         {Array.isArray(productInfo.packaging)
+                           ? `Case sizes: ${productInfo.packaging.map(p => `${p.name} (${p.size.toLocaleString()} cm²)`).join(', ')}`
+                           : `${productInfo.packaging.name} (${productInfo.packaging.size.toLocaleString()} cm²)`
+                         }
+                       </p>
+                       <div className="pricing-buttons">
+                         <button
+                           type="button"
+                           className={`pricing-btn ${form.products.some(p => p.product === productName && p.pricingType === 'perPiece') ? 'selected' : ''}`}
+                           onClick={() => {
+                             const existingIndex = form.products.findIndex(p => p.product === productName && p.pricingType === 'perPiece');
+                             if (existingIndex >= 0) {
+                               const currentQty = form.products[existingIndex].quantity;
+                               if (currentQty > 1) {
+                                 handleQuantityChange(existingIndex, (currentQty - 1).toString());
+                               } else {
+                                 removeProduct(existingIndex);
+                               }
+                             } else {
+                               const updatedProducts = [...form.products, {
+                                 product: productName,
+                                 quantity: 1,
+                                 pricingType: 'perPiece',
+                                 packageQuantity: null
+                               }];
+                               const subtotal = calculateTotalPrice(updatedProducts);
+                               setForm({ ...form, products: updatedProducts, totalPrice: subtotal });
+                             }
+                           }}
+                         >
+                           Per {productInfo.pricing.perPiece.unit}: ₱{productInfo.pricing.perPiece.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                         </button>
+                         {Array.isArray(productInfo.pricing.perPackage) ? (
+                           productInfo.pricing.perPackage.map(pkg => (
+                             <button
+                               key={pkg.quantity}
+                               type="button"
+                               className={`pricing-btn ${form.products.some(p => p.product === productName && p.pricingType === 'perPackage' && p.packageQuantity === pkg.quantity) ? 'selected' : ''}`}
+                               onClick={() => {
+                                 const existingIndex = form.products.findIndex(p => p.product === productName && p.pricingType === 'perPackage' && p.packageQuantity === pkg.quantity);
+                                 if (existingIndex >= 0) {
+                                   const currentQty = form.products[existingIndex].quantity;
+                                   if (currentQty > 1) {
+                                     handleQuantityChange(existingIndex, (currentQty - 1).toString());
+                                   } else {
+                                     removeProduct(existingIndex);
+                                   }
+                                 } else {
+                                   const updatedProducts = [...form.products, {
+                                     product: productName,
+                                     quantity: 1,
+                                     pricingType: 'perPackage',
+                                     packageQuantity: pkg.quantity
+                                   }];
+                                   const subtotal = calculateTotalPrice(updatedProducts);
+                                   setForm({ ...form, products: updatedProducts, totalPrice: subtotal });
+                                 }
+                               }}
+                             >
+                               {pkg.quantity} {productInfo.pricing.perPiece.unit}s: ₱{pkg.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                             </button>
+                           ))
+                         ) : (
+                           <button
+                             type="button"
+                             className={`pricing-btn ${form.products.some(p => p.product === productName && p.pricingType === 'perPackage') ? 'selected' : ''}`}
+                             onClick={() => {
+                               const existingIndex = form.products.findIndex(p => p.product === productName && p.pricingType === 'perPackage');
+                               if (existingIndex >= 0) {
+                                 const currentQty = form.products[existingIndex].quantity;
+                                 if (currentQty > 1) {
+                                   handleQuantityChange(existingIndex, (currentQty - 1).toString());
+                               } else {
+                                 removeProduct(existingIndex);
+                               }
+                             } else {
+                               const updatedProducts = [...form.products, {
+                                 product: productName,
+                                 quantity: 1,
+                                 pricingType: 'perPackage',
+                                 packageQuantity: productInfo.packaging.quantity
+                               }];
+                               const subtotal = calculateTotalPrice(updatedProducts);
+                               setForm({ ...form, products: updatedProducts, totalPrice: subtotal });
+                             }
+                           }}
+                         >
+                           Per {productInfo.packaging.name}: ₱{productInfo.pricing.perPackage.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                         </button>
+                         )}
+                       </div>
+                     </div>
+                     <div className="quantity-display">
+                       {(() => {
+                         const pieceEntry = form.products.find(p => p.product === productName && p.pricingType === 'perPiece');
+                         const packageEntries = form.products.filter(p => p.product === productName && p.pricingType === 'perPackage');
+
+                         return (
+                           <>
+                             {pieceEntry && (
+                               <div className="quantity-item">
+                                 <span>Per {productInfo.pricing.perPiece.unit}:</span>
+                                 <div className="quantity-controls">
+                                   <button
+                                     type="button"
+                                     className="qty-btn minus"
+                                     onClick={() => {
+                                       const currentQty = pieceEntry.quantity;
+                                       if (currentQty > 1) {
+                                         handleQuantityChange(form.products.indexOf(pieceEntry), (currentQty - 1).toString());
+                                       } else {
+                                         removeProduct(form.products.indexOf(pieceEntry));
+                                       }
+                                     }}
+                                   >
+                                     -
+                                   </button>
+                                   <span className="quantity-value">{pieceEntry.quantity}</span>
+                                   <button
+                                     type="button"
+                                     className="qty-btn plus"
+                                     onClick={() => handleQuantityChange(form.products.indexOf(pieceEntry), (pieceEntry.quantity + 1).toString())}
+                                   >
+                                     +
+                                   </button>
+                                 </div>
+                               </div>
+                             )}
+                             {packageEntries.map(entry => (
+                               <div key={entry.packageQuantity} className="quantity-item">
+                                 <span>
+                                   {Array.isArray(productInfo.packaging)
+                                     ? `${entry.packageQuantity} ${productInfo.pricing.perPiece.unit}s`
+                                     : productInfo.packaging.name}:
+                                 </span>
+                                 <div className="quantity-controls">
+                                   <button
+                                     type="button"
+                                     className="qty-btn minus"
+                                     onClick={() => {
+                                       const currentQty = entry.quantity;
+                                       if (currentQty > 1) {
+                                         handleQuantityChange(form.products.indexOf(entry), (currentQty - 1).toString());
+                                       } else {
+                                         removeProduct(form.products.indexOf(entry));
+                                       }
+                                     }}
+                                   >
+                                     -
+                                   </button>
+                                   <span className="quantity-value">{entry.quantity}</span>
+                                   <button
+                                     type="button"
+                                     className="qty-btn plus"
+                                     onClick={() => handleQuantityChange(form.products.indexOf(entry), (entry.quantity + 1).toString())}
+                                   >
+                                     +
+                                   </button>
+                                 </div>
+                               </div>
+                             ))}
+                           </>
+                         );
+                       })()}
+                     </div>
+                   </div>
+                 ))}
+               </div>
               </div>
 
               <div className="kiosk-summary">
                 <div className="order-summary">
                   <h3>Order Summary</h3>
                   <div className="summary-items">
-                    {form.products.map((item, index) => (
-                      <div key={index} className="summary-item">
-                        <span>{item.product} x {item.quantity}</span>
-                        <span>₱{((item.quantity || 0) * (products[item.product]?.price || 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                      </div>
-                    ))}
+                    {form.products.map((item, index) => {
+                      const product = products[item.product];
+                      let price = 0;
+                      let description = '';
+
+                      if (product) {
+                        if (item.pricingType === 'perPiece') {
+                          price = product.pricing.perPiece.price;
+                          description = `${item.product} (${product.pricing.perPiece.unit}) x ${item.quantity}`;
+                        } else if (item.pricingType === 'perPackage') {
+                          if (Array.isArray(product.pricing.perPackage)) {
+                            const selectedPackage = product.pricing.perPackage.find(p => p.quantity === item.packageQuantity);
+                            price = selectedPackage ? selectedPackage.price : product.pricing.perPackage[0].price;
+                            description = `${item.product} (${item.packageQuantity} ${product.pricing.perPiece.unit}s) x ${item.quantity}`;
+                          } else {
+                            price = product.pricing.perPackage.price;
+                            description = `${item.product} (${product.packaging.name}) x ${item.quantity}`;
+                          }
+                        }
+                      }
+
+                      return (
+                        <div key={index} className="summary-item">
+                          <span>{description}</span>
+                          <span>₱{(item.quantity * price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        </div>
+                      );
+                    })}
                   </div>
                  <div className="summary-total">
                    <div className="total-row">
@@ -907,12 +1199,12 @@ const POMonitoring = () => {
                      <span>₱{form.totalPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                    </div>
                    <div className="total-row">
-                     <span>Sales Tax:</span>
-                     <span>₱{(parseFloat(form.salesTax || 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                     <span>Sales Tax (12%):</span>
+                     <span>₱{(form.totalPrice * 0.12).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                    </div>
                    <div className="total-row final-total">
                      <span>Total:</span>
-                     <span>₱{(parseFloat(form.totalPrice || 0) + parseFloat(form.salesTax || 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                     <span>₱{(form.totalPrice * 1.12).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                    </div>
                  </div>
                 </div>
@@ -936,7 +1228,16 @@ const POMonitoring = () => {
           const onHold = status === 'on-hold';
           const load = calculateLoad(po);
           const vehicle = assigned ? vehicles.find(v => v.name === po.assignedTruck) : null;
-          const utilization = vehicle ? (vehicle.currentLoad / vehicle.capacity) * 100 : 0;
+          // Calculate utilization the same way as Vehicle Monitoring (max load across all dates)
+          const dateGroups = {};
+          pos
+            .filter(p => p.assignedTruck === vehicle?.name)
+            .forEach(p => {
+              if (!dateGroups[p.deliveryDate]) dateGroups[p.deliveryDate] = 0;
+              dateGroups[p.deliveryDate] += calculateLoad(p) || 0;
+            });
+          const maxLoadForVehicle = Math.max(...Object.values(dateGroups), 0);
+          const utilization = vehicle ? (maxLoadForVehicle / vehicle.capacity) * 100 : 0;
 
           return (
             <div
@@ -956,7 +1257,7 @@ const POMonitoring = () => {
                 </div>
               </div>
               <div className="card-meta">Delivery: {po.deliveryDate}</div>
-              <div className="card-meta">Load: {load.toLocaleString()} cm³</div>
+              <div className="card-meta">Load: {load.toLocaleString()} cm²</div>
               {assigned && vehicle && (
                 <div className="load-indicator">
                   <span className="vehicle-assigned">{po.assignedTruck}</span>
@@ -1003,7 +1304,12 @@ const POMonitoring = () => {
                     </div>
                     <div className="input-group">
                       <label>Company Name</label>
-                      <input name="companyName" placeholder="Enter Company Name" value={editForm.companyName} onChange={handleEditInputChange} required />
+                      <select name="companyName" value={editForm.companyName} onChange={handleEditInputChange} required>
+                        <option value="">Select Company</option>
+                        {Object.keys(customers).map(company => (
+                          <option key={company} value={company}>{company}</option>
+                        ))}
+                      </select>
                     </div>
                     <div className="input-group">
                       <label>Customer Name</label>
@@ -1033,9 +1339,15 @@ const POMonitoring = () => {
                       <label>Location</label>
                       <select name="location" value={editForm.location} onChange={handleEditInputChange} required>
                         <option value="">Select Location</option>
-                        {allLocations.map(loc => (
-                          <option key={loc} value={loc}>{loc}</option>
-                        ))}
+                        {editForm.companyName && customers[editForm.companyName] ? (
+                          customers[editForm.companyName].map(loc => (
+                            <option key={loc} value={loc}>{loc}</option>
+                          ))
+                        ) : (
+                          allLocations.map(loc => (
+                            <option key={loc} value={loc}>{loc}</option>
+                          ))
+                        )}
                       </select>
                     </div>
                     <div className="input-group">
@@ -1050,10 +1362,6 @@ const POMonitoring = () => {
                       <label>Terms of Payment</label>
                       <input name="termsOfPayment" placeholder="e.g., Net 30 days" value={editForm.termsOfPayment} onChange={handleEditInputChange} />
                     </div>
-                    <div className="input-group">
-                      <label>Sales Tax (₱)</label>
-                      <input name="salesTax" type="number" placeholder="0" value={editForm.salesTax} onChange={handleEditInputChange} />
-                    </div>
                   </div>
                 </div>
 
@@ -1064,11 +1372,67 @@ const POMonitoring = () => {
                     {editForm.products.map((item, index) => (
                       <div key={index} className="product-item">
                         <select value={item.product} onChange={(e) => handleEditProductChange(index, e.target.value)}>
-                          <option value="Jumbo Roll Tissue">Jumbo Roll Tissue</option>
-                          <option value="Hand Roll Tissue">Hand Roll Tissue</option>
-                          <option value="Interfolded Paper Towel">Interfolded Paper Towel</option>
-                          <option value="Bathroom Tissue">Bathroom Tissue</option>
+                          <option value="Interfolded">Interfolded</option>
+                          <option value="Jumbo Roll">Jumbo Roll</option>
+                          <option value="Bathroom">Bathroom</option>
+                          <option value="Hand Roll">Hand Roll</option>
                         </select>
+                        <div className="pricing-selection">
+                          <label>
+                            <input
+                              type="radio"
+                              name={`edit-pricing-${index}`}
+                              value="perPiece"
+                              checked={item.pricingType === 'perPiece'}
+                              onChange={() => {
+                                const updatedProducts = editForm.products.map((p, i) =>
+                                  i === index ? { ...p, pricingType: 'perPiece', packageQuantity: null } : p
+                                );
+                                const subtotal = calculateTotalPrice(updatedProducts);
+                                setEditForm({ ...editForm, products: updatedProducts, totalPrice: subtotal });
+                              }}
+                            />
+                            Per {products[item.product]?.pricing.perPiece.unit}
+                          </label>
+                          <label>
+                            <input
+                              type="radio"
+                              name={`edit-pricing-${index}`}
+                              value="perPackage"
+                              checked={item.pricingType === 'perPackage'}
+                              onChange={() => {
+                                const product = products[item.product];
+                                const defaultPackageQuantity = Array.isArray(product.packaging)
+                                  ? product.packaging[0].quantity
+                                  : product.packaging.quantity;
+                                const updatedProducts = editForm.products.map((p, i) =>
+                                  i === index ? { ...p, pricingType: 'perPackage', packageQuantity: defaultPackageQuantity } : p
+                                );
+                                const subtotal = calculateTotalPrice(updatedProducts);
+                                setEditForm({ ...editForm, products: updatedProducts, totalPrice: subtotal });
+                              }}
+                            />
+                            {Array.isArray(products[item.product]?.packaging) ? (
+                              <select
+                                value={item.packageQuantity || ''}
+                                onChange={(e) => {
+                                  const quantity = parseInt(e.target.value);
+                                  const updatedProducts = editForm.products.map((p, i) =>
+                                    i === index ? { ...p, packageQuantity: quantity } : p
+                                  );
+                                  const subtotal = calculateTotalPrice(updatedProducts);
+                                  setEditForm({ ...editForm, products: updatedProducts, totalPrice: subtotal });
+                                }}
+                              >
+                                {products[item.product].packaging.map(pkg => (
+                                  <option key={pkg.quantity} value={pkg.quantity}>{pkg.name}</option>
+                                ))}
+                              </select>
+                            ) : (
+                              `Per ${products[item.product]?.packaging.name}`
+                            )}
+                          </label>
+                        </div>
                         <input type="number" placeholder="Quantity" value={item.quantity} onChange={(e) => handleEditQuantityChange(index, e.target.value)} required />
                         <button type="button" onClick={() => removeEditProduct(index)}>Remove</button>
                       </div>
@@ -1081,12 +1445,34 @@ const POMonitoring = () => {
                   <div className="order-summary">
                     <h3>Updated Order Summary</h3>
                     <div className="summary-items">
-                      {editForm.products.map((item, index) => (
-                        <div key={index} className="summary-item">
-                          <span>{item.product} x {item.quantity}</span>
-                          <span>₱{((item.quantity || 0) * (products[item.product]?.price || 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                        </div>
-                      ))}
+                      {editForm.products.map((item, index) => {
+                        const product = products[item.product];
+                        let price = 0;
+                        let description = '';
+
+                        if (product) {
+                          if (item.pricingType === 'perPiece') {
+                            price = product.pricing.perPiece.price;
+                            description = `${item.product} (${product.pricing.perPiece.unit}) x ${item.quantity}`;
+                          } else if (item.pricingType === 'perPackage') {
+                            if (Array.isArray(product.pricing.perPackage)) {
+                              const selectedPackage = product.pricing.perPackage.find(p => p.quantity === item.packageQuantity);
+                              price = selectedPackage ? selectedPackage.price : product.pricing.perPackage[0].price;
+                              description = `${item.product} (${item.packageQuantity} ${product.pricing.perPiece.unit}s) x ${item.quantity}`;
+                            } else {
+                              price = product.pricing.perPackage.price;
+                              description = `${item.product} (${product.packaging.name}) x ${item.quantity}`;
+                            }
+                          }
+                        }
+
+                        return (
+                          <div key={index} className="summary-item">
+                            <span>{description}</span>
+                            <span>₱{(item.quantity * price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                          </div>
+                        );
+                      })}
                     </div>
                     <div className="summary-total">
                       <div className="total-row">
@@ -1094,12 +1480,12 @@ const POMonitoring = () => {
                         <span>₱{editForm.totalPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                       </div>
                       <div className="total-row">
-                        <span>Sales Tax:</span>
-                        <span>₱{(parseFloat(editForm.salesTax || 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        <span>Sales Tax (12%):</span>
+                        <span>₱{(editForm.totalPrice * 0.12).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                       </div>
                       <div className="total-row final-total">
                         <span>Total:</span>
-                        <span>₱{(parseFloat(editForm.totalPrice || 0) + parseFloat(editForm.salesTax || 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        <span>₱{(editForm.totalPrice * 1.12).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                       </div>
                     </div>
                   </div>
@@ -1165,18 +1551,39 @@ const POMonitoring = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {selectedPO.products.map((item, index) => (
-                    <tr key={index}>
-                      <td>{index + 1}</td>
-                      <td>{item.product}</td>
-                      <td>-</td>
-                      <td>{item.quantity}</td>
-                      <td>PCS</td>
-                      <td>{selectedPO.deliveryDate}</td>
-                      <td>₱{products[item.product]?.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || 0}</td>
-                      <td>₱{((item.quantity || 0) * (products[item.product]?.price || 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                    </tr>
-                  ))}
+                  {selectedPO.products.map((item, index) => {
+                    const product = products[item.product];
+                    let unitPrice = 0;
+                    let unit = 'PCS';
+
+                    if (product) {
+                      if (item.pricingType === 'perPiece') {
+                        unitPrice = product.pricing.perPiece.price;
+                        unit = product.pricing.perPiece.unit.toUpperCase();
+                      } else if (item.pricingType === 'perPackage') {
+                        if (Array.isArray(product.pricing.perPackage)) {
+                          const selectedPackage = product.pricing.perPackage.find(p => p.quantity === item.packageQuantity);
+                          unitPrice = selectedPackage ? selectedPackage.price : product.pricing.perPackage[0].price;
+                        } else {
+                          unitPrice = product.pricing.perPackage.price;
+                        }
+                        unit = Array.isArray(product.packaging) ? 'CASE' : product.packaging.type.toUpperCase();
+                      }
+                    }
+
+                    return (
+                      <tr key={index}>
+                        <td>{index + 1}</td>
+                        <td>{item.product}</td>
+                        <td>-</td>
+                        <td>{item.quantity}</td>
+                        <td>{unit}</td>
+                        <td>{selectedPO.deliveryDate}</td>
+                        <td>₱{unitPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        <td>₱{(item.quantity * unitPrice).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -1187,9 +1594,9 @@ const POMonitoring = () => {
                 <p><strong>Terms of payment:</strong> {selectedPO.termsOfPayment || 'Not specified'}</p>
               </div>
               <div className="summary-right">
-                <p><strong>Total:</strong> ₱{selectedPO.totalPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                <p><strong>Sales tax:</strong> ₱{(parseFloat(selectedPO.salesTax || 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                <p><strong>Total amount:</strong> ₱{(parseFloat(selectedPO.totalPrice || 0) + parseFloat(selectedPO.salesTax || 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                <p><strong>Subtotal:</strong> ₱{selectedPO.totalPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                <p><strong>Sales tax (12%):</strong> ₱{(selectedPO.totalPrice * 0.12).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                <p><strong>Total amount:</strong> ₱{(selectedPO.totalPrice * 1.12).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
               </div>
             </div>
 

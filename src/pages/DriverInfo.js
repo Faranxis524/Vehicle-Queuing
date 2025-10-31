@@ -24,6 +24,7 @@ const DriverInfo = () => {
       });
 
       // Derive drivers from initialized vehicles, then merge (no duplicates by name)
+      // Only include drivers that are assigned to vehicles (exclude old drivers like Alice Brown and John Doe)
       const derivedFromVehicles = vehicles
         .map(v => ({
           id: `veh-${v.id}`,
@@ -32,11 +33,11 @@ const DriverInfo = () => {
           confirmed: true,
           status: v.status || 'Available'
         }))
-        .filter(d => d.name);
+        .filter(d => d.name && ['Randy Maduro', 'Adrian Silao', 'Fernando Besa', 'Joseph Allan Saldivar'].includes(d.name));
 
       const existingByName = new Set(driversData.map(d => (d.name || '').toLowerCase()));
       const merged = [
-        ...driversData,
+        ...driversData.filter(d => ['Randy Maduro', 'Adrian Silao', 'Fernando Besa', 'Joseph Allan Saldivar'].includes(d.name)),
         ...derivedFromVehicles.filter(d => !existingByName.has((d.name || '').toLowerCase()))
       ];
 
@@ -121,7 +122,6 @@ const DriverInfo = () => {
   return (
     <div className="driver-info">
       <h1>Driver Info</h1>
-      <button onClick={() => setShowForm(!showForm)}>+ Add Driver</button>
       {showForm && (
         <form onSubmit={handleSubmit} className="driver-form">
           <input name="name" placeholder="Driver Name" value={form.name} onChange={handleInputChange} required />

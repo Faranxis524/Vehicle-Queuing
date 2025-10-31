@@ -41,6 +41,23 @@
   color: rgba(229,231,235,0.5);
 }
 
+/* Light theme placeholder visibility */
+[data-theme='light'] .login-form input::placeholder {
+  color: rgba(0,0,0,0.6);
+}
+
+/* Light theme input styling */
+[data-theme='light'] .login-form input {
+  border-color: rgba(0,0,0,0.2);
+  background: rgba(0,0,0,0.04);
+}
+
+[data-theme='light'] .login-form input:focus {
+  border-color: rgba(59,130,246,0.5);
+  box-shadow: 0 0 0 3px rgba(59,130,246,0.1);
+  background: rgba(0,0,0,0.02);
+}
+
 .login-form input:focus {
   border-color: rgba(255,255,255,0.22);
   box-shadow: 0 0 0 3px rgba(185,28,28,0.25);

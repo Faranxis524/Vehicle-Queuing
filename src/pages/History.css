@@ -145,3 +145,74 @@
 [data-theme='light'] .history-table .muted {
   color: var(--muted);
 }
+
+/* Modal Scrolling Fix */
+.po-detail-modal {
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+/* Completed PO Cards Styling */
+.completed-pos-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  margin: 20px 0;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.po-card.completed-po-card {
+  background: var(--card-bg, rgba(255,255,255,0.02));
+  border: 1px solid var(--border-color, rgba(255,255,255,0.1));
+  border-radius: 12px;
+  padding: 16px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.po-card.completed-po-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+  border-color: rgba(255,255,255,0.2);
+  background: var(--card-bg-hover, rgba(255,255,255,0.05));
+}
+
+.po-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.po-number {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.po-status {
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.po-status.completed {
+  background: #2196f3;
+  color: white;
+}
+
+.po-summary p {
+  margin: 4px 0;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.po-summary p strong {
+  color: var(--text);
+  font-weight: 600;
+}
