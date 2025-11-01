@@ -390,6 +390,18 @@
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
+.input-group input.error {
+  border-color: #dc2626;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+}
+
+.error-message {
+  color: #dc2626;
+  font-size: 12px;
+  margin-top: 4px;
+  display: block;
+}
+
 /* Product selection styles */
 .product-selection {
   display: grid;
@@ -758,6 +770,32 @@
 
 .delete-btn:hover {
   background: #b91c1c !important;
+}
+
+.confirm-btn {
+  background: #059669 !important;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background-color 0.2s;
+  margin-right: 10px;
+}
+
+.confirm-btn:hover {
+  background: #047857 !important;
+}
+
+.badge.delivered {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: white;
+}
+
+.badge.delivered .dot {
+  background: #fbbf24;
 }
 
 .vehicle-assignment {

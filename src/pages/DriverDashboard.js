@@ -246,21 +246,15 @@ const DriverDashboard = () => {
   const updateDeliveryStatus = async (poId, newStatus) => {
     const po = pos.find(p => p.id === poId);
     if (newStatus === 'done') {
-      // Move completed PO to history collection
-      await addDoc(collection(db, 'completed-pos'), {
-        ...po,
-        completedAt: new Date(),
-        completedBy: loggedInDriver.name
-      });
-      // Remove from active POs
-      await updateDoc(doc(db, 'pos', poId), { status: 'completed', deliveryStatus: newStatus });
+      // Change status to 'delivered' for admin confirmation instead of moving to history immediately
+      await updateDoc(doc(db, 'pos', poId), { status: 'delivered', deliveryStatus: newStatus });
     } else {
       await updateDoc(doc(db, 'pos', poId), { deliveryStatus: newStatus });
     }
 
     await addDoc(collection(db, 'history'), {
       timestamp: new Date(),
-      action: newStatus === 'done' ? 'PO Completed and Moved to History' : 'Updated Delivery Status',
+      action: newStatus === 'done' ? 'PO Marked as Delivered (Awaiting Admin Confirmation)' : 'Updated Delivery Status',
       details: `PO ${po.customId} status updated to ${newStatus} by ${loggedInDriver.name}`
     });
   };

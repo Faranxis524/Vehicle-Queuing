@@ -103,6 +103,8 @@ const POMonitoring = () => {
     termsOfPayment: '',
     status: 'pending'
   });
+  const [phoneError, setPhoneError] = useState('');
+  const [deliveryDateError, setDeliveryDateError] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [selectedPO, setSelectedPO] = useState(null);
   const [showModal, setShowModal] = useState(false);
@@ -134,7 +136,7 @@ const POMonitoring = () => {
         querySnapshot.forEach((doc) => {
           posData.push({ id: doc.id, customId: doc.data().customId, ...doc.data() });
         });
-        // Filter out completed POs from the main display
+        // Filter out completed POs from the main display (keep delivered for admin confirmation)
         setPos(posData.filter(po => po.status !== 'completed'));
 
         // Recompute vehicle loads and assigned POs from Firestore POs (persists across refresh)
@@ -274,6 +276,69 @@ const POMonitoring = () => {
     });
   };
 
+  const validatePhilippinePhoneNumber = (phoneNumber) => {
+    if (!phoneNumber.trim()) return { isValid: true, error: '' }; // Optional field
+
+    // Remove all spaces and hyphens for validation
+    const cleanNumber = phoneNumber.replace(/[\s\-]/g, '');
+
+    // Check for +63 prefix
+    if (cleanNumber.startsWith('+63')) {
+      const digitsAfterPrefix = cleanNumber.substring(3);
+      if (digitsAfterPrefix.length === 10 && /^\d{10}$/.test(digitsAfterPrefix)) {
+        // Valid: +63 followed by 10 digits (e.g., +639123456789)
+        return { isValid: true, error: '' };
+      }
+    }
+    // Check for 09 prefix (local format)
+    else if (cleanNumber.startsWith('09')) {
+      if (cleanNumber.length === 11 && /^\d{11}$/.test(cleanNumber)) {
+        // Valid: 09 followed by 9 digits (e.g., 09123456789)
+        return { isValid: true, error: '' };
+      }
+    }
+    // Check for 9 prefix (without 0)
+    else if (cleanNumber.startsWith('9')) {
+      if (cleanNumber.length === 10 && /^\d{10}$/.test(cleanNumber)) {
+        // Valid: 9 followed by 9 digits (e.g., 9123456789)
+        return { isValid: true, error: '' };
+      }
+    }
+
+    return {
+      isValid: false,
+      error: 'Please enter a valid Philippine phone number (+63XXXXXXXXXX, 09XXXXXXXXX, or 9XXXXXXXXX)'
+    };
+  };
+
+  const validateDeliveryDate = (deliveryDate, orderDate) => {
+    if (!deliveryDate) return { isValid: true, error: '' }; // Will be caught by required field validation
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Reset time to start of day for date comparison
+
+    const delivery = new Date(deliveryDate);
+    const order = orderDate ? new Date(orderDate) : null;
+
+    // Check if delivery date is before today
+    if (delivery < today) {
+      return {
+        isValid: false,
+        error: 'Delivery date cannot be in the past'
+      };
+    }
+
+    // Check if delivery date is before order date
+    if (order && delivery < order) {
+      return {
+        isValid: false,
+        error: 'Delivery date cannot be before the order date'
+      };
+    }
+
+    return { isValid: true, error: '' };
+  };
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     if (name === 'companyName') {
@@ -283,6 +348,23 @@ const POMonitoring = () => {
         newForm.location = '';
       }
       setForm(newForm);
+    } else if (name === 'phone') {
+      // Validate phone number
+      const validation = validatePhilippinePhoneNumber(value);
+      setPhoneError(validation.error);
+      setForm({ ...form, [name]: value });
+    } else if (name === 'deliveryDate') {
+      // Validate delivery date
+      const validation = validateDeliveryDate(value, form.poDate);
+      setDeliveryDateError(validation.error);
+      setForm({ ...form, [name]: value });
+    } else if (name === 'poDate') {
+      // When order date changes, re-validate delivery date
+      setForm({ ...form, [name]: value });
+      if (form.deliveryDate) {
+        const validation = validateDeliveryDate(form.deliveryDate, value);
+        setDeliveryDateError(validation.error);
+      }
     } else {
       setForm({ ...form, [name]: value });
     }
@@ -601,6 +683,23 @@ const POMonitoring = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // Validate phone number if provided
+    if (form.phone.trim()) {
+      const phoneValidation = validatePhilippinePhoneNumber(form.phone);
+      if (!phoneValidation.isValid) {
+        alert(phoneValidation.error);
+        return;
+      }
+    }
+
+    // Validate delivery date
+    const deliveryValidation = validateDeliveryDate(form.deliveryDate, form.poDate);
+    if (!deliveryValidation.isValid) {
+      alert(deliveryValidation.error);
+      return;
+    }
+
     if (!form.poNumber || !form.companyName || !form.customerName || !form.poDate || !form.location || !form.deliveryDate || !form.address || form.products.length === 0 || form.products.some(p => !p.product || p.quantity <= 0 || !p.pricingType)) {
       alert('Please fill all required fields with valid data.');
       return;
@@ -942,7 +1041,14 @@ const POMonitoring = () => {
                   </div>
                   <div className="input-group">
                     <label>Phone Number</label>
-                    <input name="phone" placeholder="Enter Phone Number" value={form.phone} onChange={handleInputChange} />
+                    <input
+                      name="phone"
+                      placeholder="+63XXXXXXXXXX or 09XXXXXXXXX"
+                      value={form.phone}
+                      onChange={handleInputChange}
+                      className={phoneError ? 'error' : ''}
+                    />
+                    {phoneError && <span className="error-message">{phoneError}</span>}
                   </div>
                   <div className="input-group">
                     <label>Order Date</label>
@@ -950,7 +1056,16 @@ const POMonitoring = () => {
                   </div>
                   <div className="input-group">
                     <label>Delivery Date</label>
-                    <input name="deliveryDate" type="date" value={form.deliveryDate} onChange={handleInputChange} required />
+                    <input
+                      name="deliveryDate"
+                      type="date"
+                      value={form.deliveryDate}
+                      onChange={handleInputChange}
+                      min={new Date().toISOString().split('T')[0]}
+                      className={deliveryDateError ? 'error' : ''}
+                      required
+                    />
+                    {deliveryDateError && <span className="error-message">{deliveryDateError}</span>}
                   </div>
                   <div className="input-group">
                     <label>Location</label>
@@ -1226,6 +1341,7 @@ const POMonitoring = () => {
           const status = po.status || 'pending';
           const assigned = status === 'assigned';
           const onHold = status === 'on-hold';
+          const delivered = status === 'delivered';
           const load = calculateLoad(po);
           const vehicle = assigned ? vehicles.find(v => v.name === po.assignedTruck) : null;
           // Calculate utilization the same way as Vehicle Monitoring (max load across all dates)
@@ -1251,9 +1367,9 @@ const POMonitoring = () => {
                   <div className="card-title">PO {po.customId}</div>
                   <div className="card-subtitle">{po.companyName}</div>
                 </div>
-                <div className={`badge ${assigned ? 'success' : onHold ? 'warning' : 'info'}`}>
+                <div className={`badge ${assigned ? 'success' : onHold ? 'warning' : delivered ? 'delivered' : 'info'}`}>
                   <span className="dot"></span>
-                  {assigned ? 'Assigned' : onHold ? 'On Hold' : 'Pending'}
+                  {assigned ? 'Assigned' : onHold ? 'On Hold' : delivered ? 'Delivered' : 'Pending'}
                 </div>
               </div>
               <div className="card-meta">Delivery: {po.deliveryDate}</div>
@@ -1608,7 +1724,7 @@ const POMonitoring = () => {
                 </div>
               ) : (
                 <>
-                  <p><strong>Status:</strong> {selectedPO.status === 'assigned' ? 'Assigned' : selectedPO.status === 'on-hold' ? 'On Hold' : 'Pending'}</p>
+                  <p><strong>Status:</strong> {selectedPO.status === 'assigned' ? 'Assigned' : selectedPO.status === 'on-hold' ? 'On Hold' : selectedPO.status === 'delivered' ? 'Delivered (Awaiting Confirmation)' : 'Pending'}</p>
                   <p><strong>Assigned Vehicle:</strong> {selectedPO.assignedTruck || 'None'}</p>
                   {(selectedPO.status === 'pending' || selectedPO.status === 'on-hold') && (
                     <div className="vehicle-assignment">
@@ -1716,6 +1832,30 @@ const POMonitoring = () => {
                     </div>
                   )}
                   <div className="action-buttons">
+                    {selectedPO.status === 'delivered' && (
+                      <button
+                        onClick={async () => {
+                          if (window.confirm('Confirm delivery completion? This will move the PO to History.')) {
+                            // Move to history collection
+                            await addDoc(collection(db, 'history'), {
+                              ...selectedPO,
+                              timestamp: new Date(),
+                              action: 'PO Completed and Confirmed',
+                              details: `PO ${selectedPO.customId} delivery confirmed by admin and moved to history`
+                            });
+
+                            // Update PO status to completed
+                            await updateDoc(doc(db, 'pos', selectedPO.id), { status: 'completed' });
+
+                            setShowModal(false);
+                            alert('PO delivery confirmed and moved to History!');
+                          }
+                        }}
+                        className="confirm-btn"
+                      >
+                        Confirm Delivery
+                      </button>
+                    )}
                     <button onClick={handleUpdate}>Update</button>
                     <button onClick={handleDelete} className="delete-btn">Delete</button>
                     <button onClick={() => setShowModal(false)}>Close</button>
