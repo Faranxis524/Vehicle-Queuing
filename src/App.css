@@ -156,6 +156,9 @@ body {
 .badge.success .dot { background: var(--success); }
 .badge.warning .dot { background: var(--warning); }
 .badge.danger .dot { background: var(--danger); }
+.badge.error .dot { background: var(--primary); }
+.badge.transit .dot { background: #8b5cf6; } /* Purple for in-transit */
+.badge.delivered .dot { background: #2196f3; } /* Blue for delivered */
 .badge.info .dot { background: var(--primary); }
 
 .progress {

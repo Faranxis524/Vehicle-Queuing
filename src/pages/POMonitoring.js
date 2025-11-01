@@ -57,15 +57,19 @@ const customers = {
 
 const clusters = {
   'Cluster 1': {
-    locations: ['Pampanga', 'Bulacan', 'Entech Pampanga']
+    name: 'North Luzon',
+    locations: ['Pampanga', 'Entech Pampanga', 'Bulacan']
   },
   'Cluster 2': {
+    name: 'Metro Manila North/East',
     locations: ['Quezon City', 'Bridgetown Quezon City', 'Binondo', 'Mega Town']
   },
   'Cluster 3': {
-    locations: ['Makati', 'BGC Taguig', 'Panorama BGC Taguig', 'Bench Taguig', 'Uptown', 'Menarco', 'Milestone', 'MOA', 'Alabang']
+    name: 'Metro Manila South/Center',
+    locations: ['Makati', 'RCBC', 'BGC Taguig', 'Panorama BGC Taguig', 'Bench Taguig', 'Uptown', 'Menarco', 'Milestone', 'MOA', 'Alabang']
   },
   'Cluster 4': {
+    name: 'CALABARZON (South Luzon)',
     locations: ['Alabang', 'Calamba', 'Lipa']
   }
 };
@@ -84,7 +88,7 @@ if (missingLocations.length > 0) {
 
 
 const POMonitoring = () => {
-  const { vehicles, updateVehicle, setVehicles } = useVehicles();
+  const { vehicles, updateVehicle, setVehicles, assignPOToVehicle, rebalanceLoads } = useVehicles();
   const [pos, setPos] = useState([]);
   const [form, setForm] = useState({
     poNumber: '',
@@ -867,73 +871,18 @@ const POMonitoring = () => {
     }
   };
 
-  // Load rebalancing function to optimize existing assignments
-  const rebalanceLoads = useCallback(async () => {
-    if (window.confirm('This will attempt to rebalance vehicle loads for better distribution. Continue?')) {
-      const allPOs = [...pos];
-      const vehicleAssignments = {};
-
-      // Initialize vehicle assignments
-      vehicles.forEach(vehicle => {
-        vehicleAssignments[vehicle.name] = {
-          vehicle,
-          assignedPOs: [],
-          totalLoad: 0
-        };
-      });
-
-      // Clear all current assignments first
-      for (const po of allPOs) {
-        if (po.assignedTruck) {
-          const vehicle = vehicles.find(v => v.name === po.assignedTruck);
-          if (vehicle) {
-            updateVehicle(vehicle.id, {
-              currentLoad: 0,
-              assignedPOs: []
-            });
-          }
-        }
+  // Enhanced load rebalancing function with full recalculation and dimension compliance
+  const handleRebalanceLoads = useCallback(async () => {
+    if (window.confirm('This will attempt to rebalance vehicle loads for better distribution using enhanced load management rules including dimension compliance. Continue?')) {
+      try {
+        const result = await rebalanceLoads(pos);
+        alert(result);
+      } catch (error) {
+        console.error('Rebalance error:', error);
+        alert('An error occurred during rebalancing. Please check the console for details.');
       }
-
-      // Sort POs by delivery date and load (largest first for better packing)
-      allPOs.sort((a, b) => {
-        if (a.deliveryDate !== b.deliveryDate) {
-          return new Date(a.deliveryDate) - new Date(b.deliveryDate);
-        }
-        return calculateLoad(b) - calculateLoad(a);
-      });
-
-      // Reassign all POs using optimized algorithm
-      for (const po of allPOs) {
-        const assignedVehicle = assignVehicleAutomatically({ ...po, assignedTruck: null });
-        if (assignedVehicle) {
-          vehicleAssignments[assignedVehicle].assignedPOs.push(po);
-          vehicleAssignments[assignedVehicle].totalLoad += calculateLoad(po);
-
-          await updateDoc(doc(db, 'pos', po.id), {
-            assignedTruck: assignedVehicle,
-            load: calculateLoad(po),
-            status: 'assigned'
-          });
-
-          await addDoc(collection(db, 'history'), {
-            timestamp: new Date(),
-            action: 'Rebalanced PO Assignment',
-            details: `PO ${po.customId} re-assigned to ${assignedVehicle}`
-          });
-        } else {
-          // If no vehicle available, set to on-hold
-          await updateDoc(doc(db, 'pos', po.id), {
-            assignedTruck: null,
-            status: 'on-hold',
-            load: calculateLoad(po)
-          });
-        }
-      }
-
-      alert('Load rebalancing completed. Check the history for details.');
     }
-  }, [pos, vehicles, calculateLoad, assignVehicleAutomatically, updateVehicle]);
+  }, [pos, rebalanceLoads]);
 
   const handleAssign = useCallback(async (vehicleId) => {
     const load = calculateLoad(selectedPO);
@@ -1000,7 +949,7 @@ const POMonitoring = () => {
       <h1>PO Monitoring</h1>
       <div className="header-actions">
         <button className="add-po-btn" onClick={() => setShowForm(true)}>+ Add PO</button>
-        <button className="rebalance-btn" onClick={rebalanceLoads}>Rebalance Loads</button>
+        <button className="rebalance-btn" onClick={handleRebalanceLoads}>Rebalance Loads</button>
       </div>
       {showForm && (
         <div className="modal">
@@ -1341,6 +1290,8 @@ const POMonitoring = () => {
           const status = po.status || 'pending';
           const assigned = status === 'assigned';
           const onHold = status === 'on-hold';
+          const unassignable = status === 'unassignable';
+          const inTransit = status === 'in-transit';
           const delivered = status === 'delivered';
           const load = calculateLoad(po);
           const vehicle = assigned ? vehicles.find(v => v.name === po.assignedTruck) : null;
@@ -1358,18 +1309,18 @@ const POMonitoring = () => {
           return (
             <div
               key={po.id}
-              className="card"
+              className={`card ${inTransit ? 'in-transit' : ''}`}
               onClick={() => handleCardClick(po)}
-              title={`PO ${po.customId} • ${po.companyName}`}
+              title={inTransit ? `PO ${po.customId} • In-Transit - View Only` : `PO ${po.customId} • ${po.companyName}`}
             >
               <div className="card-header">
                 <div>
                   <div className="card-title">PO {po.customId}</div>
                   <div className="card-subtitle">{po.companyName}</div>
                 </div>
-                <div className={`badge ${assigned ? 'success' : onHold ? 'warning' : delivered ? 'delivered' : 'info'}`}>
+                <div className={`badge ${assigned ? 'success' : onHold ? 'warning' : unassignable ? 'error' : inTransit ? 'transit' : delivered ? 'delivered' : 'info'}`}>
                   <span className="dot"></span>
-                  {assigned ? 'Assigned' : onHold ? 'On Hold' : delivered ? 'Delivered' : 'Pending'}
+                  {assigned ? 'Assigned' : onHold ? 'On Hold' : unassignable ? 'Unassignable' : inTransit ? 'In-Transit' : delivered ? 'Delivered' : 'Pending'}
                 </div>
               </div>
               <div className="card-meta">Delivery: {po.deliveryDate}</div>
@@ -1724,113 +1675,9 @@ const POMonitoring = () => {
                 </div>
               ) : (
                 <>
-                  <p><strong>Status:</strong> {selectedPO.status === 'assigned' ? 'Assigned' : selectedPO.status === 'on-hold' ? 'On Hold' : selectedPO.status === 'delivered' ? 'Delivered (Awaiting Confirmation)' : 'Pending'}</p>
+                  <p><strong>Status:</strong> {selectedPO.status === 'assigned' ? 'Assigned' : selectedPO.status === 'on-hold' ? 'On Hold' : selectedPO.status === 'unassignable' ? 'Unassignable' : selectedPO.status === 'in-transit' ? 'In-Transit' : selectedPO.status === 'delivered' ? 'Delivered (Awaiting Confirmation)' : 'Pending'}</p>
                   <p><strong>Assigned Vehicle:</strong> {selectedPO.assignedTruck || 'None'}</p>
-                  {(selectedPO.status === 'pending' || selectedPO.status === 'on-hold') && (
-                    <div className="vehicle-assignment">
-                      <h3>Suitable Vehicles (Optimized by Load & Cluster)</h3>
-                      {(() => {
-                        const load = calculateLoad(selectedPO);
-                        const clusterName = findCluster(selectedPO.location);
-                        const maxCapacity = Math.max(...vehicles.map(v => v.capacity));
 
-                        // Get eligible vehicles with enhanced scoring
-                        const eligibleVehicles = vehicles.filter(vehicle => {
-                          const usedForDate = getUsedLoadForVehicleOnDate(vehicle, selectedPO.deliveryDate);
-                          const lockedCluster = getClusterForVehicleOnDate(vehicle, selectedPO.deliveryDate);
-                          const hasCapacity = (vehicle.capacity - usedForDate) >= load;
-                          const clusterOk = !lockedCluster || lockedCluster === clusterName;
-                          // Check driver status - vehicle is only available if driver status is 'Available'
-                          const driverAvailable = vehicle.status === 'Available';
-                          return vehicle.ready && hasCapacity && clusterOk && driverAvailable;
-                        });
-
-                        // If location is not in any defined cluster, show error
-                        if (!clusterName) {
-                          return (
-                            <p className="error-message">
-                              This location is not assigned to any cluster. Please check the location or contact an administrator.
-                            </p>
-                          );
-                        }
-
-                        if (eligibleVehicles.length === 0) {
-                          return load > maxCapacity ? (
-                            <p className="error-message">
-                              This order exceeds the maximum load capacity of any vehicle. Please split the order into smaller batches.
-                            </p>
-                          ) : (
-                            <p>No suitable vehicles available for the selected delivery date. Vehicles may be full or locked to a different cluster.</p>
-                          );
-                        }
-
-                        // Score and sort vehicles for optimal assignment
-                        const scoredVehicles = eligibleVehicles.map(vehicle => {
-                          const usedForDate = getUsedLoadForVehicleOnDate(vehicle, selectedPO.deliveryDate);
-                          const remainingCapacity = vehicle.capacity - usedForDate;
-                          const utilizationAfter = (usedForDate + load) / vehicle.capacity;
-
-                          // Calculate cluster efficiency
-                          const clusterMatches = (vehicle.assignedPOs || []).reduce((acc, poId) => {
-                            const assignedPO = pos.find(p => p.id === poId);
-                            return acc + (assignedPO && assignedPO.deliveryDate === selectedPO.deliveryDate && findCluster(assignedPO.location) === clusterName ? 1 : 0);
-                          }, 0);
-
-                          // Calculate load efficiency score
-                          let loadEfficiency = 0;
-                          if (utilizationAfter <= 0.6) loadEfficiency = 2;
-                          else if (utilizationAfter <= 0.85) loadEfficiency = 3;
-                          else if (utilizationAfter <= 0.95) loadEfficiency = 1;
-                          else loadEfficiency = -1;
-
-                          // Size efficiency
-                          let sizeEfficiency = 0;
-                          if (load <= vehicle.capacity * 0.3 && vehicle.capacity > 10000000) sizeEfficiency = -0.5;
-                          else if (load > vehicle.capacity * 0.8 && vehicle.capacity < 10000000) sizeEfficiency = -1;
-
-                          const totalScore = (clusterMatches * 2) + loadEfficiency + sizeEfficiency;
-
-                          return {
-                            vehicle,
-                            totalScore,
-                            utilizationAfter,
-                            remainingCapacity,
-                            clusterMatches
-                          };
-                        });
-
-                        // Sort by score (best first)
-                        scoredVehicles.sort((a, b) => b.totalScore - a.totalScore);
-
-                        return scoredVehicles.map(({ vehicle, utilizationAfter, remainingCapacity, clusterMatches }) => (
-                          <div key={vehicle.id} className="vehicle-option">
-                            <div className="vehicle-info">
-                              <strong>{vehicle.name}</strong>
-                              <div className="vehicle-details">
-                                <span>Utilization: {(utilizationAfter * 100).toFixed(1)}%</span>
-                                <span>Remaining: {remainingCapacity.toLocaleString()} cm²</span>
-                                {clusterMatches > 0 && <span className="cluster-match">✓ Same cluster</span>}
-                                <span className={`driver-status ${vehicle.status?.toLowerCase().replace(' ', '-')}`}>
-                                  Driver: {vehicle.status || 'Unknown'}
-                                </span>
-                              </div>
-                              <div className="load-bar">
-                                <div
-                                  className="load-fill"
-                                  style={{
-                                    width: `${Math.min(utilizationAfter * 100, 100)}%`,
-                                    backgroundColor: utilizationAfter > 0.9 ? '#ff6b6b' :
-                                                   utilizationAfter > 0.75 ? '#ffa726' : '#4caf50'
-                                  }}
-                                ></div>
-                              </div>
-                            </div>
-                            <button onClick={() => handleAssign(vehicle.id)}>Assign</button>
-                          </div>
-                        ));
-                      })()}
-                    </div>
-                  )}
                   <div className="action-buttons">
                     {selectedPO.status === 'delivered' && (
                       <button
@@ -1856,8 +1703,12 @@ const POMonitoring = () => {
                         Confirm Delivery
                       </button>
                     )}
-                    <button onClick={handleUpdate}>Update</button>
-                    <button onClick={handleDelete} className="delete-btn">Delete</button>
+                    {selectedPO.status !== 'delivered' && selectedPO.status !== 'in-transit' && (
+                      <>
+                        <button onClick={handleUpdate}>Update</button>
+                        <button onClick={handleDelete} className="delete-btn">Delete</button>
+                      </>
+                    )}
                     <button onClick={() => setShowModal(false)}>Close</button>
                   </div>
                 </>

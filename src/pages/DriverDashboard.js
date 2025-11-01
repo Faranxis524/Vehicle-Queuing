@@ -205,7 +205,7 @@ const DriverDashboard = () => {
         }
       });
 
-      // If driver becomes available, automatically update PO statuses from on-hold to assigned
+      // Handle status changes that affect PO statuses
       if (status === 'Available') {
         const vehicle = vehicles.find(v => v.name === loggedInDriver.vehicle);
         if (vehicle) {
@@ -216,6 +216,34 @@ const DriverDashboard = () => {
               timestamp: new Date(),
               action: 'PO Status Auto-Updated',
               details: `PO ${po.customId} status changed from on-hold to assigned - driver ${loggedInDriver.name} became available`
+            });
+          }
+        }
+      } else if (status === 'In-transit') {
+        // When driver goes in-transit, set all assigned POs to in-transit status
+        const vehicle = vehicles.find(v => v.name === loggedInDriver.vehicle);
+        if (vehicle) {
+          const assignedPOs = pos.filter(po => po.assignedTruck === loggedInDriver.vehicle && po.status === 'assigned');
+          for (const po of assignedPOs) {
+            await updateDoc(doc(db, 'pos', po.id), { status: 'in-transit' });
+            await addDoc(collection(db, 'history'), {
+              timestamp: new Date(),
+              action: 'PO Status Auto-Updated',
+              details: `PO ${po.customId} status changed to in-transit - driver ${loggedInDriver.name} started delivery`
+            });
+          }
+        }
+      } else if (status !== 'In-transit' && loggedInDriver.status === 'In-transit') {
+        // When driver changes from in-transit to another status, reset PO statuses back to assigned
+        const vehicle = vehicles.find(v => v.name === loggedInDriver.vehicle);
+        if (vehicle) {
+          const inTransitPOs = pos.filter(po => po.assignedTruck === loggedInDriver.vehicle && po.status === 'in-transit');
+          for (const po of inTransitPOs) {
+            await updateDoc(doc(db, 'pos', po.id), { status: 'assigned' });
+            await addDoc(collection(db, 'history'), {
+              timestamp: new Date(),
+              action: 'PO Status Auto-Updated',
+              details: `PO ${po.customId} status changed back to assigned - driver ${loggedInDriver.name} status changed from in-transit`
             });
           }
         }
@@ -312,6 +340,7 @@ const DriverDashboard = () => {
             <select value={status} onChange={(e) => setStatus(e.target.value)}>
               <option value="Not Set">Not Set</option>
               <option value="Available">Available</option>
+              <option value="In-transit">In-transit</option>
               <option value="Unavailable">Unavailable</option>
               <option value="Under Maintenance">Under Maintenance</option>
             </select>

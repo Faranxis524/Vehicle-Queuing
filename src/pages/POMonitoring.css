@@ -755,12 +755,8 @@
 }
 
 .action-buttons button:first-child {
-  background: #3b82f6;
-  color: white;
-}
-
-.action-buttons button:first-child:hover {
-  background: #2563eb;
+  background: #ffffff;
+  color: rgb(0, 0, 0);
 }
 
 .delete-btn {
@@ -789,13 +785,8 @@
   background: #047857 !important;
 }
 
-.badge.delivered {
-  background: linear-gradient(135deg, #f59e0b, #d97706);
-  color: white;
-}
-
 .badge.delivered .dot {
-  background: #fbbf24;
+  background: #2196f3;
 }
 
 .vehicle-assignment {
@@ -1016,4 +1007,27 @@
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+/* In-transit card styling */
+.card.in-transit {
+  opacity: 0.7;
+  cursor: not-allowed;
+  position: relative;
+}
+
+.card.in-transit::after {
+  content: "🚛 OUT FOR DELIVERY";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(139, 92, 246, 0.9);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  z-index: 10;
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
 }

@@ -142,7 +142,7 @@ const DriverInfo = () => {
                 <div className="card-title">{driver.name}</div>
                 <div className="card-subtitle">Vehicle: {driver.vehicle || '—'}</div>
               </div>
-              <div className={`badge ${driver.status === 'Available' ? 'success' : (driver.status === 'Unavailable' ? 'danger' : 'warning')}`}>
+              <div className={`badge ${driver.status === 'Available' ? 'success' : (driver.status === 'Unavailable' ? 'danger' : (driver.status === 'In-transit' ? 'transit' : 'warning'))}`}>
                 <span className="dot"></span>
                 {driver.status || 'Not Set'}
               </div>

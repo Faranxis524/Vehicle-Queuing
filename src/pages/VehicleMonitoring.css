@@ -121,18 +121,38 @@
   text-transform: uppercase;
 }
 
-.po-status.assigned {
-  background: #4caf50;
-  color: white;
-}
-
 .po-status.pending {
   background: #ff9800;
   color: white;
 }
 
+.po-status.assigned {
+  background: #4caf50;
+  color: white;
+}
+
+.po-status.in-transit {
+  background: #8b5cf6;
+  color: white;
+}
+
+.po-status.delivered {
+  background: #2196f3;
+  color: white;
+}
+
+.po-status.completed {
+  background: #2196f3;
+  color: white;
+}
+
 .po-status.on-hold {
   background: #f44336;
+  color: white;
+}
+
+.po-status.unassignable {
+  background: #9e9e9e;
   color: white;
 }
 
