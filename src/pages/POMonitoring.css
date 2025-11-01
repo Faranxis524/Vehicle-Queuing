@@ -293,6 +293,8 @@
   width: 95%;
   max-height: 90vh;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
 }
 
 .kiosk-header {
@@ -335,6 +337,8 @@
   display: flex;
   flex-direction: column;
   gap: 30px;
+  flex: 1;
+  overflow-y: auto;
 }
 
 .kiosk-section {
@@ -557,6 +561,9 @@
   display: flex;
   gap: 15px;
   justify-content: flex-end;
+  flex-shrink: 0;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-color, rgba(255,255,255,0.1));
 }
 
 .cancel-btn {

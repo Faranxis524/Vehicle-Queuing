@@ -57,7 +57,7 @@ const customers = {
 
 const clusters = {
   'Cluster 1': {
-    locations: ['Pampanga', 'Bulacan']
+    locations: ['Pampanga', 'Bulacan', 'Entech Pampanga']
   },
   'Cluster 2': {
     locations: ['Quezon City', 'Bridgetown Quezon City', 'Binondo', 'Mega Town']
