@@ -171,6 +171,17 @@ const DriverDashboard = () => {
   };
 
   const handleStatusUpdate = async () => {
+    // Check if trying to change from In-transit status
+    if (loggedInDriver.status === 'In-transit' && status !== 'In-transit') {
+      const assignedPOs = pos.filter(po => po.assignedDriver === loggedInDriver.name || po.assignedTruck === loggedInDriver.vehicle);
+      const allDone = assignedPOs.every(po => po.deliveryStatus === 'done');
+      if (!allDone) {
+        alert('You cannot change your status from In-transit until all assigned POs are marked as done.');
+        setUpdatingStatus(false);
+        return;
+      }
+    }
+
     setUpdatingStatus(true);
     try {
       // Ensure we have a persistent driver document (create if derived from vehicles)
@@ -379,7 +390,6 @@ const DriverDashboard = () => {
           <div className="status-controls">
             <label>Current Status</label>
             <select value={status} onChange={(e) => setStatus(e.target.value)}>
-              <option value="Not Set">Not Set</option>
               <option value="Available">Available</option>
               <option value="In-transit">In-transit</option>
               <option value="Unavailable">Unavailable</option>
@@ -434,6 +444,10 @@ const DriverDashboard = () => {
                             e.stopPropagation();
                             const nextStatus = po.deliveryStatus === 'pending' ? 'departure' : po.deliveryStatus === 'departure' ? 'ongoing' : 'done';
                             if (nextStatus === 'done') {
+                              if (loggedInDriver.status !== 'In-transit') {
+                                alert('You can only mark POs as done when your status is In-transit.');
+                                return;
+                              }
                               if (window.confirm('Warning: Marking this PO as done cannot be undone and will move it to History. Continue?')) {
                                 updateDeliveryStatus(po.id, nextStatus);
                               }
