@@ -268,7 +268,7 @@ const DriverDashboard = () => {
 
   const handleLogout = () => {
     localStorage.removeItem('loggedInDriver');
-    window.location.href = '/driver-login';
+    window.location.href = '/login';
   };
 
   const updateDeliveryStatus = async (poId, newStatus) => {
@@ -325,12 +325,53 @@ const DriverDashboard = () => {
         <div className="welcome-card card">
           <h2>Welcome, {loggedInDriver.name}</h2>
           <p><strong>Vehicle:</strong> {loggedInDriver.vehicle}</p>
-          <p><strong>Confirmed:</strong> {loggedInDriver.confirmed ? 'Yes' : 'No'}</p>
-          {!loggedInDriver.confirmed && (
-            <button className="btn btn-primary" onClick={handleConfirm}>
-              Confirm Assignment
-            </button>
-          )}
+          {(() => {
+            // Get driver details from the same data structure used in DriverInfo
+            const driverDetails = {
+              'Randy Maduro': {
+                contactNumber: '09154080447',
+                helpers: [
+                  { name: 'Marvin Soriano', contactNumber: '09169334034' },
+                  { name: 'Raymond Marbella', contactNumber: 'N/A' }
+                ]
+              },
+              'Adrian Silao': {
+                contactNumber: '09096835513',
+                helpers: [
+                  { name: 'Randolph Villamor', contactNumber: '09123305204' }
+                ]
+              },
+              'Fernando Besa': {
+                contactNumber: '09551453174',
+                helpers: [
+                  { name: 'Noel Bulahog', contactNumber: '09702937219' }
+                ]
+              },
+              'Joseph Allan Saldivar': {
+                contactNumber: '09751432072',
+                helpers: [
+                  { name: 'Ronilo Ligao', contactNumber: '09932977963' }
+                ]
+              }
+            };
+
+            const details = driverDetails[loggedInDriver.name];
+            return details ? (
+              <div className="driver-details">
+                <p><strong>Contact Number:</strong> {details.contactNumber}</p>
+                {details.helpers && details.helpers.length > 0 && (
+                  <div className="dashboard-helpers">
+                    {details.helpers.map((helper, index) => (
+                      <div key={index} className="helper-detail">
+                        <p><strong>Truck Helper:</strong> {helper.name}</p>
+                        <p><strong>Contact Number:</strong> {helper.contactNumber}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : null;
+          })()}
         </div>
 
         <div className="status-card card">
@@ -358,47 +399,58 @@ const DriverDashboard = () => {
           <h3>Assigned Purchase Orders</h3>
           {pos.length === 0 ? (
             <p>No POs found in the system.</p>
-          ) : pos.filter(po => po.assignedDriver === loggedInDriver.name || po.assignedTruck === loggedInDriver.vehicle).length === 0 ? (
-            <p>No POs assigned to you yet. Check back later or contact your supervisor.</p>
-          ) : (
-            <div className="pos-grid">
-              {pos.filter(po => po.assignedDriver === loggedInDriver.name || po.assignedTruck === loggedInDriver.vehicle).map(po => (
-                <div key={po.id} className="po-card driver-po-card" onClick={() => setSelectedPO(po)}>
-                  <div className="po-header">
-                    <span className="po-number">PO {po.customId}</span>
-                    <span className={`po-status ${po.deliveryStatus || 'pending'}`}>{po.deliveryStatus || 'pending'}</span>
-                  </div>
-                  <div className="po-summary">
-                    <p><strong>{po.companyName}</strong></p>
-                    <p>{po.customerName}</p>
-                    <p>{po.location}</p>
-                    <p>{po.deliveryDate}</p>
-                    <p><strong>Load: {po.load ? po.load.toLocaleString() : '0'} cm²</strong></p>
-                  </div>
-                  <div className="po-actions">
-                    {po.deliveryStatus !== 'done' && (
-                      <button
-                        className="btn btn-small btn-primary"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const nextStatus = po.deliveryStatus === 'pending' ? 'departure' : po.deliveryStatus === 'departure' ? 'ongoing' : 'done';
-                          if (nextStatus === 'done') {
-                            if (window.confirm('Warning: Marking this PO as done cannot be undone and will move it to History. Continue?')) {
+          ) : (() => {
+            const assignedPOs = pos.filter(po => po.assignedDriver === loggedInDriver.name || po.assignedTruck === loggedInDriver.vehicle);
+            // Sort POs: incomplete ones first, then completed ones
+            const sortedPOs = assignedPOs.sort((a, b) => {
+              const aDone = a.deliveryStatus === 'done';
+              const bDone = b.deliveryStatus === 'done';
+              if (aDone && !bDone) return 1; // a is done, b is not - b comes first
+              if (!aDone && bDone) return -1; // a is not done, b is done - a comes first
+              return 0; // both same status, maintain current order
+            });
+            return sortedPOs.length === 0 ? (
+              <p>No POs assigned to you yet. Check back later or contact your supervisor.</p>
+            ) : (
+              <div className="pos-grid">
+                {sortedPOs.map(po => (
+                  <div key={po.id} className="po-card driver-po-card" onClick={() => setSelectedPO(po)}>
+                    <div className="po-header">
+                      <span className="po-number">PO {po.customId}</span>
+                      <span className={`po-status ${po.deliveryStatus || 'pending'}`}>{po.deliveryStatus || 'pending'}</span>
+                    </div>
+                    <div className="po-summary">
+                      <p><strong>{po.companyName}</strong></p>
+                      <p>{po.customerName}</p>
+                      <p>{po.location}</p>
+                      <p>{po.deliveryDate}</p>
+                      <p><strong>Load: {po.load ? po.load.toLocaleString() : '0'} cm²</strong></p>
+                    </div>
+                    <div className="po-actions">
+                      {po.deliveryStatus !== 'done' && (
+                        <button
+                          className="btn btn-small btn-primary"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const nextStatus = po.deliveryStatus === 'pending' ? 'departure' : po.deliveryStatus === 'departure' ? 'ongoing' : 'done';
+                            if (nextStatus === 'done') {
+                              if (window.confirm('Warning: Marking this PO as done cannot be undone and will move it to History. Continue?')) {
+                                updateDeliveryStatus(po.id, nextStatus);
+                              }
+                            } else {
                               updateDeliveryStatus(po.id, nextStatus);
                             }
-                          } else {
-                            updateDeliveryStatus(po.id, nextStatus);
-                          }
-                        }}
-                      >
-                        {po.deliveryStatus === 'pending' ? 'Depart' : po.deliveryStatus === 'departure' ? 'Ongoing' : 'Mark as Done'}
-                      </button>
-                    )}
+                          }}
+                        >
+                          {po.deliveryStatus === 'pending' ? 'Depart' : po.deliveryStatus === 'departure' ? 'Ongoing' : 'Mark as Done'}
+                        </button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            );
+          })()}
         </div>
       </div>
 

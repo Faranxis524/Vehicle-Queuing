@@ -1,19 +1,46 @@
 import React, { useState, useEffect } from 'react';
-import { collection, addDoc, onSnapshot, query, orderBy, updateDoc, doc } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useVehicles } from '../contexts/VehicleContext';
 import './DriverInfo.css';
 
+// Extended driver information with contact details and helpers
+const driverDetails = {
+  'Randy Maduro': {
+    vehicle: 'Isuzu Truck',
+    contactNumber: '09154080447',
+    helpers: [
+      { name: 'Marvin Soriano', contactNumber: '09169334034' },
+      { name: 'Raymond Marbella', contactNumber: 'N/A' }
+    ]
+  },
+  'Adrian Silao': {
+    vehicle: 'Hyundai H100',
+    contactNumber: '09096835513',
+    helpers: [
+      { name: 'Randolph Villamor', contactNumber: '09123305204' }
+    ]
+  },
+  'Fernando Besa': {
+    vehicle: 'Isuzu Flexy Small',
+    contactNumber: '09551453174',
+    helpers: [
+      { name: 'Noel Bulahog', contactNumber: '09702937219' }
+    ]
+  },
+  'Joseph Allan Saldivar': {
+    vehicle: 'Isuzu Flexy Big',
+    contactNumber: '09751432072',
+    helpers: [
+      { name: 'Ronilo Ligao', contactNumber: '09932977963' }
+    ]
+  }
+};
+
 
 const DriverInfo = () => {
-  const { vehicles, updateVehicle } = useVehicles();
+  const { vehicles } = useVehicles();
   const [drivers, setDrivers] = useState([]);
-  const [form, setForm] = useState({
-    name: '',
-    vehicle: ''
-  });
-  const [showForm, setShowForm] = useState(false);
-  const [editingDriver, setEditingDriver] = useState(null);
 
   useEffect(() => {
     const q = query(collection(db, 'drivers'), orderBy('createdAt'));
@@ -46,115 +73,50 @@ const DriverInfo = () => {
     return unsubscribe;
   }, [vehicles]);
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setForm({ ...form, [name]: value });
-  };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    try {
-      if (editingDriver) {
-        if (!editingDriver.id || String(editingDriver.id).startsWith('veh-')) {
-          // Derived from vehicles; create a persistent driver document
-          const newDriver = {
-            name: form.name,
-            vehicle: form.vehicle,
-            confirmed: false,
-            status: 'Not Set',
-            createdAt: new Date()
-          };
-          const ref = await addDoc(collection(db, 'drivers'), newDriver);
-          // Log to history
-          await addDoc(collection(db, 'history'), {
-            timestamp: new Date(),
-            action: 'Added Driver',
-            details: `Driver ${newDriver.name} assigned to ${newDriver.vehicle}`
-          });
-        } else {
-          // Update existing Firestore driver
-          await updateDoc(doc(db, 'drivers', editingDriver.id), form);
-          setDrivers(drivers.map(d => d.id === editingDriver.id ? { ...d, ...form } : d));
-          await addDoc(collection(db, 'history'), {
-            timestamp: new Date(),
-            action: 'Updated Driver',
-            details: `Driver ${form.name} updated vehicle to ${form.vehicle}`
-          });
-        }
-      } else {
-        // Add new driver
-        const newDriver = {
-          ...form,
-          confirmed: false,
-          status: 'Not Set',
-          createdAt: new Date()
-        };
-        await addDoc(collection(db, 'drivers'), newDriver);
-        await addDoc(collection(db, 'history'), {
-          timestamp: new Date(),
-          action: 'Added Driver',
-          details: `Driver ${form.name} assigned to ${form.vehicle}`
-        });
-      }
-
-      // Reflect assignment back to vehicle context
-      const vehicle = vehicles.find(v => v.name === form.vehicle);
-      if (vehicle) {
-        updateVehicle(vehicle.id, { driver: form.name });
-      }
-
-      setForm({ name: '', vehicle: '' });
-      setShowForm(false);
-      setEditingDriver(null);
-    } catch (err) {
-      console.error('Driver save failed', err);
-      alert('Failed to save driver. Please try again.');
-    }
-  };
-
-  const handleEdit = (driver) => {
-    setForm({ name: driver.name, vehicle: driver.vehicle });
-    setEditingDriver(driver);
-    setShowForm(true);
-  };
 
   return (
     <div className="driver-info">
       <h1>Driver Info</h1>
-      {showForm && (
-        <form onSubmit={handleSubmit} className="driver-form">
-          <input name="name" placeholder="Driver Name" value={form.name} onChange={handleInputChange} required />
-          <select name="vehicle" value={form.vehicle} onChange={handleInputChange} required>
-            <option value="">Select Vehicle</option>
-            {vehicles.map(vehicle => (
-              <option key={vehicle.id} value={vehicle.name}>{vehicle.name}</option>
-            ))}
-          </select>
-          <button type="submit">Submit</button>
-        </form>
-      )}
       <div className="driver-list grid">
-        {drivers.map(driver => (
-          <div key={driver.id} className="card" title={`${driver.name} • ${driver.vehicle || 'Unassigned'}`}>
-            <div className="card-header">
-              <div>
-                <div className="card-title">{driver.name}</div>
-                <div className="card-subtitle">Vehicle: {driver.vehicle || '—'}</div>
+        {drivers.map(driver => {
+          const details = driverDetails[driver.name];
+          return (
+            <div key={driver.id} className="card" title={`${driver.name} • ${driver.vehicle || 'Unassigned'}`}>
+              <div className="card-header">
+                <div>
+                  <div className="card-title">{driver.name}</div>
+                  <div className="card-subtitle">Vehicle: {driver.vehicle || '—'}</div>
+                </div>
+                <div className={`badge ${driver.status === 'Available' ? 'success' : (driver.status === 'Unavailable' ? 'danger' : (driver.status === 'In-transit' ? 'transit' : 'warning'))}`}>
+                  <span className="dot"></span>
+                  {driver.status || 'Not Set'}
+                </div>
               </div>
-              <div className={`badge ${driver.status === 'Available' ? 'success' : (driver.status === 'Unavailable' ? 'danger' : (driver.status === 'In-transit' ? 'transit' : 'warning'))}`}>
-                <span className="dot"></span>
-                {driver.status || 'Not Set'}
-              </div>
+
+              {details && (
+                <div className="card-content">
+                  <div className="driver-contact">
+                    <p><strong>Contact Number:</strong> {details.contactNumber}</p>
+                  </div>
+
+                  {details.helpers && details.helpers.length > 0 && (
+                    <div className="truck-helpers">
+                      {details.helpers.map((helper, index) => (
+                        <div key={index} className="helper-info">
+                          <p><strong>Truck Helper:</strong> {helper.name}</p>
+                          <p><strong>Contact Number:</strong> {helper.contactNumber}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
-            <div className="card-meta">Confirmed: {driver.confirmed ? 'Yes' : 'No'}</div>
-            <div className="card-footer">
-              <button className="btn btn-primary" onClick={() => handleEdit(driver)}>Edit</button>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
-      <p className="card-meta" style={{ marginTop: 12 }}>For drivers to log in and update, they can access /driver-login</p>
+      <p className="card-meta" style={{ marginTop: 12 }}>For drivers to log in and update, they can access /login</p>
     </div>
   );
 };

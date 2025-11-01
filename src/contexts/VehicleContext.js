@@ -383,8 +383,8 @@ export const VehicleProvider = ({ children }) => {
     // Create a working copy of vehicles for assignment tracking
     let workingVehicles = [...resetVehicles];
     
-    // Filter out completed and in-transit POs - only rebalance pending, assigned, on-hold, and unassignable POs
-    const activePOs = allPOs.filter(po => po.status !== 'completed' && po.status !== 'in-transit');
+    // Filter out completed, in-transit, and delivered POs - only rebalance pending, assigned, on-hold, and unassignable POs
+    const activePOs = allPOs.filter(po => po.status !== 'completed' && po.status !== 'in-transit' && po.status !== 'delivered');
     
     // Rule 1: Delivery Date Priority - Group by delivery date, process earliest first
     const posByDate = {};

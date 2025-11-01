@@ -29,18 +29,18 @@ const products = {
   },
   'Bathroom': {
     size: 0, // Individual roll dimension = 0
-    packaging: { type: 'bundle', quantity: 48, name: 'Bundle (48 rolls)', size: 45630 },
+    packaging: { type: 'case', quantity: 48, name: 'Case (48 rolls)', size: 45630 },
     pricing: {
       perPiece: { price: 8.15, unit: 'roll' },
-      perPackage: { price: 408, unit: 'bundle' }
+      perPackage: { price: 408, unit: 'case' }
     }
   },
   'Hand Roll': {
     size: 0, // Individual roll dimension = 0
-    packaging: { type: 'bundle', quantity: 6, name: 'Bundle (6 rolls)', size: 46200 },
+    packaging: { type: 'case', quantity: 6, name: 'Case (6 rolls)', size: 46200 },
     pricing: {
       perPiece: { price: 134, unit: 'roll' },
-      perPackage: { price: 804, unit: 'bundle' }
+      perPackage: { price: 804, unit: 'case' }
     }
   }
 };
@@ -93,7 +93,6 @@ const POMonitoring = () => {
   const [form, setForm] = useState({
     poNumber: '',
     companyName: '',
-    customerName: '',
     poDate: '',
     location: '',
     deliveryDate: '',
@@ -117,7 +116,6 @@ const POMonitoring = () => {
   const [editForm, setEditForm] = useState({
     poNumber: '',
     companyName: '',
-    customerName: '',
     poDate: '',
     location: '',
     deliveryDate: '',
@@ -609,7 +607,10 @@ const POMonitoring = () => {
   };
 
   const handleQuantityChange = (index, value) => {
-    const updatedProducts = form.products.map((item, i) => i === index ? { ...item, quantity: parseInt(value) || 0 } : item);
+    const newQuantity = parseInt(value) || 0;
+    const updatedProducts = form.products.map((item, i) =>
+      i === index ? { ...item, quantity: newQuantity } : item
+    );
     const subtotal = calculateTotalPrice(updatedProducts);
     setForm({ ...form, products: updatedProducts, totalPrice: subtotal });
   };
@@ -653,7 +654,7 @@ const POMonitoring = () => {
   };
 
   const handleSaveUpdate = async () => {
-    if (!editForm.poNumber || !editForm.companyName || !editForm.customerName || !editForm.poDate || !editForm.location || !editForm.deliveryDate || !editForm.address || editForm.products.length === 0 || editForm.products.some(p => !p.product || p.quantity <= 0 || !p.pricingType)) {
+    if (!editForm.poNumber || !editForm.companyName || !editForm.poDate || !editForm.location || !editForm.deliveryDate || !editForm.address || editForm.products.length === 0 || editForm.products.some(p => !p.product || p.quantity <= 0 || !p.pricingType)) {
       alert('Please fill all required fields with valid data.');
       return;
     }
@@ -704,10 +705,261 @@ const POMonitoring = () => {
       return;
     }
 
-    if (!form.poNumber || !form.companyName || !form.customerName || !form.poDate || !form.location || !form.deliveryDate || !form.address || form.products.length === 0 || form.products.some(p => !p.product || p.quantity <= 0 || !p.pricingType)) {
+    if (!form.poNumber || !form.companyName || !form.poDate || !form.location || !form.deliveryDate || !form.address || form.products.length === 0 || form.products.some(p => !p.product || p.quantity <= 0 || !p.pricingType)) {
       alert('Please fill all required fields with valid data.');
       return;
     }
+
+    // Check for optimization opportunities
+    const optimizationSuggestions = [];
+    form.products.forEach((item, index) => {
+      if (item.pricingType === 'perPiece') {
+        const product = products[item.product];
+        if (product && item.quantity > 0) {
+          let canOptimize = false;
+          let suggestion = '';
+
+          // Check for single case products
+          if (!Array.isArray(product.packaging) && product.packaging.quantity) {
+            const caseSize = product.packaging.quantity;
+            const fullCases = Math.floor(item.quantity / caseSize);
+            const remainingPieces = item.quantity % caseSize;
+
+            if (fullCases > 0) {
+              canOptimize = true;
+              suggestion = `${fullCases} case${fullCases > 1 ? 's' : ''} (${fullCases * caseSize} pieces)${remainingPieces > 0 ? ` + ${remainingPieces} individual piece${remainingPieces > 1 ? 's' : ''}` : ''}`;
+            }
+          }
+          // Check for multiple case products
+          else if (Array.isArray(product.packaging)) {
+            const sortedCases = product.packaging.sort((a, b) => b.quantity - a.quantity);
+            let remainingQuantity = item.quantity;
+            let totalCases = 0;
+
+            for (const caseOption of sortedCases) {
+              if (remainingQuantity >= caseOption.quantity) {
+                const cases = Math.floor(remainingQuantity / caseOption.quantity);
+                if (cases > 0) {
+                  totalCases += cases;
+                  remainingQuantity -= cases * caseOption.quantity;
+                }
+              }
+            }
+
+            if (totalCases > 0) {
+              canOptimize = true;
+              suggestion = `${totalCases} case${totalCases > 1 ? 's' : ''} (${item.quantity - remainingQuantity} pieces)${remainingQuantity > 0 ? ` + ${remainingQuantity} individual piece${remainingQuantity > 1 ? 's' : ''}` : ''}`;
+            }
+          }
+
+          if (canOptimize) {
+            optimizationSuggestions.push({
+              product: item.product,
+              current: `${item.quantity} individual ${product.pricing.perPiece.unit}s`,
+              suggested: suggestion,
+              index: index
+            });
+          }
+        }
+      }
+    });
+
+    // Show optimization confirmation if there are suggestions
+    if (optimizationSuggestions.length > 0) {
+      const suggestionsText = optimizationSuggestions.map(s =>
+        `${s.product}: ${s.current} → ${s.suggested}`
+      ).join('\n');
+
+      const confirmOptimization = window.confirm(
+        `We found optimization opportunities for better pricing:\n\n${suggestionsText}\n\nWould you like to apply these optimizations?`
+      );
+
+      if (confirmOptimization) {
+        // Apply optimizations
+        let optimizedProducts = [...form.products];
+
+        optimizationSuggestions.forEach(suggestion => {
+          const item = form.products[suggestion.index];
+          const product = products[item.product];
+          const index = suggestion.index;
+
+          // Remove the original item
+          optimizedProducts.splice(index, 1);
+
+          // Add optimized entries
+          if (!Array.isArray(product.packaging) && product.packaging.quantity) {
+            const caseSize = product.packaging.quantity;
+            const fullCases = Math.floor(item.quantity / caseSize);
+            const remainingPieces = item.quantity % caseSize;
+
+            if (fullCases > 0) {
+              optimizedProducts.push({
+                product: item.product,
+                quantity: fullCases,
+                pricingType: 'perPackage',
+                packageQuantity: caseSize
+              });
+            }
+
+            if (remainingPieces > 0) {
+              optimizedProducts.push({
+                product: item.product,
+                quantity: remainingPieces,
+                pricingType: 'perPiece',
+                packageQuantity: null
+              });
+            }
+          } else if (Array.isArray(product.packaging)) {
+            const sortedCases = product.packaging.sort((a, b) => b.quantity - a.quantity);
+            let remainingQuantity = item.quantity;
+
+            for (const caseOption of sortedCases) {
+              if (remainingQuantity >= caseOption.quantity) {
+                const cases = Math.floor(remainingQuantity / caseOption.quantity);
+                if (cases > 0) {
+                  optimizedProducts.push({
+                    product: item.product,
+                    quantity: cases,
+                    pricingType: 'perPackage',
+                    packageQuantity: caseOption.quantity
+                  });
+                  remainingQuantity -= cases * caseOption.quantity;
+                }
+              }
+            }
+
+            if (remainingQuantity > 0) {
+              optimizedProducts.push({
+                product: item.product,
+                quantity: remainingQuantity,
+                pricingType: 'perPiece',
+                packageQuantity: null
+              });
+            }
+          }
+        });
+
+        // Update form with optimized products immediately so user sees the changes
+        const subtotal = calculateTotalPrice(optimizedProducts);
+        setForm({ ...form, products: optimizedProducts, totalPrice: subtotal });
+
+        // Continue with PO creation using the optimized products
+        const newPO = {
+          customId: form.poNumber,
+          ...form,
+          products: optimizedProducts,
+          totalPrice: subtotal,
+          createdAt: new Date()
+        };
+
+        // Continue with the rest of the submission logic...
+        setLoading(true);
+        try {
+          // Persist computed load so vehicle load can be reconstructed reliably after refresh
+          newPO.load = calculateLoad(newPO);
+
+          // Hard guard: if the order exceeds the capacity of every vehicle, stop and show an error
+          const maxCapacity = Math.max(...vehicles.map(v => v.capacity));
+          if (newPO.load > maxCapacity) {
+            alert('This order exceeds the maximum load capacity of any available vehicle. Please split the order into multiple POs.');
+            return;
+          }
+
+          // Check if location is in a defined cluster
+          const poCluster = findCluster(newPO.location);
+          if (!poCluster) {
+            alert('This location is not assigned to any cluster. Please select a valid location or contact an administrator.');
+            return;
+          }
+
+          const docRef = await addDoc(collection(db, 'pos'), newPO);
+          const poId = docRef.id;
+
+          // Automate assignment
+          const assignedVehicle = assignVehicleAutomatically({ ...newPO, id: poId });
+          if (assignedVehicle) {
+            // Keep Firestore field naming as 'assignedTruck' for backward compatibility
+            // Also persist computed load so vehicle loads can be reconstructed after refresh
+            await updateDoc(docRef, { assignedTruck: assignedVehicle, load: newPO.load, status: 'assigned' });
+            newPO.assignedTruck = assignedVehicle;
+            newPO.status = 'assigned';
+
+            // assignedPOs and currentLoad already updated via VehicleContext.assignLoad
+
+            // Log assignment
+            await addDoc(collection(db, 'history'), {
+              timestamp: new Date(),
+              action: 'Auto-Assigned PO to Vehicle',
+              details: `PO ${newPO.customId} auto-assigned to ${assignedVehicle}`
+            });
+          } else {
+            // Set status to on-hold when no vehicle is available
+            await updateDoc(docRef, { status: 'on-hold', load: newPO.load });
+            newPO.status = 'on-hold';
+
+            // Check if the issue is driver status or cluster availability
+            const clusterName = findCluster(newPO.location);
+            const allVehiclesForDate = vehicles.filter(v => {
+              const usedForDate = getUsedLoadForVehicleOnDate(v, newPO.deliveryDate);
+              const clusterForDate = getClusterForVehicleOnDate(v, newPO.deliveryDate);
+              const hasCapacity = (v.capacity - usedForDate) >= newPO.load;
+              const clusterOk = !clusterForDate || clusterForDate === clusterName;
+              return v.ready && hasCapacity && clusterOk;
+            });
+
+            const unavailableDrivers = allVehiclesForDate.filter(v => v.status !== 'Available');
+            const availableVehicles = allVehiclesForDate.filter(v => v.status === 'Available');
+
+            if (unavailableDrivers.length > 0 && availableVehicles.length === 0) {
+              alert(`No suitable vehicles available in cluster ${clusterName}. All vehicles have drivers with status: ${unavailableDrivers.map(v => `${v.name} (${v.status})`).join(', ')}. Please check driver statuses or wait for drivers to become available. PO has been placed on hold.`);
+            } else if (availableVehicles.length === 0) {
+              alert(`No suitable vehicles available in cluster ${clusterName} for this PO on the selected delivery date. Vehicles may be full or restricted to another cluster. PO has been placed on hold.`);
+            } else {
+              alert('No suitable vehicle available for this PO. PO has been placed on hold.');
+            }
+
+            // Log on-hold status
+            await addDoc(collection(db, 'history'), {
+              timestamp: new Date(),
+              action: 'PO Placed On Hold',
+              details: `PO ${newPO.customId} placed on hold - no available vehicles in cluster ${clusterName}`
+            });
+          }
+
+          setForm({
+            poNumber: '',
+            companyName: '',
+            poDate: '',
+            location: '',
+            deliveryDate: '',
+            products: [],
+            totalPrice: 0,
+            assignedTruck: '',
+            address: '',
+            contact: '',
+            phone: '',
+            currency: 'PHP',
+            termsOfPayment: '',
+            status: 'pending'
+          });
+          setShowForm(false);
+          // Log to history
+          const productsStr = newPO.products.map(item => `${item.product}: ${item.quantity}`).join(', ');
+          await addDoc(collection(db, 'history'), {
+            timestamp: new Date(),
+            action: 'Added PO',
+            details: `PO ${newPO.customId}: Company: ${newPO.companyName}, Date: ${newPO.poDate}, Location: ${newPO.location}, Delivery: ${newPO.deliveryDate}, Products: ${productsStr}, Total: ${newPO.totalPrice}`
+          });
+        } catch (error) {
+          console.error('Error adding PO:', error);
+          alert('Failed to add PO. Please check your connection and try again.');
+        } finally {
+          setLoading(false);
+        }
+        return; // Exit early since we've handled the optimized submission
+      }
+    }
+
     setLoading(true);
     try {
       const newPO = {
@@ -789,7 +1041,6 @@ const POMonitoring = () => {
       setForm({
         poNumber: '',
         companyName: '',
-        customerName: '',
         poDate: '',
         location: '',
         deliveryDate: '',
@@ -809,7 +1060,7 @@ const POMonitoring = () => {
       await addDoc(collection(db, 'history'), {
         timestamp: new Date(),
         action: 'Added PO',
-        details: `PO ${newPO.customId}: Company: ${newPO.companyName}, Customer: ${newPO.customerName}, Date: ${newPO.poDate}, Location: ${newPO.location}, Delivery: ${newPO.deliveryDate}, Products: ${productsStr}, Total: ${newPO.totalPrice}`
+        details: `PO ${newPO.customId}: Company: ${newPO.companyName}, Date: ${newPO.poDate}, Location: ${newPO.location}, Delivery: ${newPO.deliveryDate}, Products: ${productsStr}, Total: ${newPO.totalPrice}`
       });
     } catch (error) {
       console.error('Error adding PO:', error);
@@ -829,7 +1080,6 @@ const POMonitoring = () => {
     setEditForm({
       poNumber: selectedPO.customId,
       companyName: selectedPO.companyName,
-      customerName: selectedPO.customerName,
       poDate: selectedPO.poDate,
       location: selectedPO.location,
       deliveryDate: selectedPO.deliveryDate,
@@ -866,7 +1116,7 @@ const POMonitoring = () => {
       await addDoc(collection(db, 'history'), {
         timestamp: new Date(),
         action: 'Deleted PO',
-        details: `PO ${selectedPO.customId}: Company: ${selectedPO.companyName}, Customer: ${selectedPO.customerName}, Products: ${productsStr}`
+        details: `PO ${selectedPO.customId}: Company: ${selectedPO.companyName}, Products: ${productsStr}`
       });
     }
   };
@@ -976,10 +1226,7 @@ const POMonitoring = () => {
                       ))}
                     </select>
                   </div>
-                  <div className="input-group">
-                    <label>Customer Name</label>
-                    <input name="customerName" placeholder="Enter Customer Name" value={form.customerName} onChange={handleInputChange} required />
-                  </div>
+
                   <div className="input-group">
                     <label>Address</label>
                     <input name="address" placeholder="Enter Delivery Address" value={form.address} onChange={handleInputChange} required />
@@ -1060,164 +1307,224 @@ const POMonitoring = () => {
                          }
                        </p>
                        <div className="pricing-buttons">
-                         <button
-                           type="button"
-                           className={`pricing-btn ${form.products.some(p => p.product === productName && p.pricingType === 'perPiece') ? 'selected' : ''}`}
-                           onClick={() => {
-                             const existingIndex = form.products.findIndex(p => p.product === productName && p.pricingType === 'perPiece');
-                             if (existingIndex >= 0) {
-                               const currentQty = form.products[existingIndex].quantity;
-                               if (currentQty > 1) {
-                                 handleQuantityChange(existingIndex, (currentQty - 1).toString());
-                               } else {
-                                 removeProduct(existingIndex);
-                               }
-                             } else {
-                               const updatedProducts = [...form.products, {
-                                 product: productName,
-                                 quantity: 1,
-                                 pricingType: 'perPiece',
-                                 packageQuantity: null
-                               }];
-                               const subtotal = calculateTotalPrice(updatedProducts);
-                               setForm({ ...form, products: updatedProducts, totalPrice: subtotal });
-                             }
-                           }}
-                         >
-                           Per {productInfo.pricing.perPiece.unit}: ₱{productInfo.pricing.perPiece.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                         </button>
-                         {Array.isArray(productInfo.pricing.perPackage) ? (
-                           productInfo.pricing.perPackage.map(pkg => (
-                             <button
-                               key={pkg.quantity}
-                               type="button"
-                               className={`pricing-btn ${form.products.some(p => p.product === productName && p.pricingType === 'perPackage' && p.packageQuantity === pkg.quantity) ? 'selected' : ''}`}
-                               onClick={() => {
-                                 const existingIndex = form.products.findIndex(p => p.product === productName && p.pricingType === 'perPackage' && p.packageQuantity === pkg.quantity);
-                                 if (existingIndex >= 0) {
-                                   const currentQty = form.products[existingIndex].quantity;
-                                   if (currentQty > 1) {
-                                     handleQuantityChange(existingIndex, (currentQty - 1).toString());
-                                   } else {
-                                     removeProduct(existingIndex);
-                                   }
-                                 } else {
-                                   const updatedProducts = [...form.products, {
-                                     product: productName,
-                                     quantity: 1,
-                                     pricingType: 'perPackage',
-                                     packageQuantity: pkg.quantity
-                                   }];
-                                   const subtotal = calculateTotalPrice(updatedProducts);
-                                   setForm({ ...form, products: updatedProducts, totalPrice: subtotal });
-                                 }
-                               }}
-                             >
-                               {pkg.quantity} {productInfo.pricing.perPiece.unit}s: ₱{pkg.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                             </button>
-                           ))
-                         ) : (
+                         <div className="pricing-row">
                            <button
                              type="button"
-                             className={`pricing-btn ${form.products.some(p => p.product === productName && p.pricingType === 'perPackage') ? 'selected' : ''}`}
+                             className={`pricing-btn ${form.products.some(p => p.product === productName && p.pricingType === 'perPiece') ? 'selected' : ''}`}
                              onClick={() => {
-                               const existingIndex = form.products.findIndex(p => p.product === productName && p.pricingType === 'perPackage');
+                               const existingIndex = form.products.findIndex(p => p.product === productName && p.pricingType === 'perPiece');
                                if (existingIndex >= 0) {
                                  const currentQty = form.products[existingIndex].quantity;
                                  if (currentQty > 1) {
                                    handleQuantityChange(existingIndex, (currentQty - 1).toString());
+                                 } else {
+                                   removeProduct(existingIndex);
+                                 }
                                } else {
-                                 removeProduct(existingIndex);
+                                 const updatedProducts = [...form.products, {
+                                   product: productName,
+                                   quantity: 1,
+                                   pricingType: 'perPiece',
+                                   packageQuantity: null
+                                 }];
+                                 const subtotal = calculateTotalPrice(updatedProducts);
+                                 setForm({ ...form, products: updatedProducts, totalPrice: subtotal });
                                }
-                             } else {
-                               const updatedProducts = [...form.products, {
-                                 product: productName,
-                                 quantity: 1,
-                                 pricingType: 'perPackage',
-                                 packageQuantity: productInfo.packaging.quantity
-                               }];
-                               const subtotal = calculateTotalPrice(updatedProducts);
-                               setForm({ ...form, products: updatedProducts, totalPrice: subtotal });
-                             }
-                           }}
-                         >
-                           Per {productInfo.packaging.name}: ₱{productInfo.pricing.perPackage.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                         </button>
+                             }}
+                           >
+                             Per {productInfo.pricing.perPiece.unit}: ₱{productInfo.pricing.perPiece.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                           </button>
+                           {(() => {
+                             const pieceEntry = form.products.find(p => p.product === productName && p.pricingType === 'perPiece');
+                             return pieceEntry ? (
+                               <div className="inline-quantity-controls">
+                                 <button
+                                   type="button"
+                                   className="qty-btn minus"
+                                   onClick={() => {
+                                     const currentQty = pieceEntry.quantity;
+                                     if (currentQty > 1) {
+                                       handleQuantityChange(form.products.indexOf(pieceEntry), (currentQty - 1).toString());
+                                     } else {
+                                       removeProduct(form.products.indexOf(pieceEntry));
+                                     }
+                                   }}
+                                 >
+                                   -
+                                 </button>
+                                 <input
+                                   type="number"
+                                   className="quantity-input"
+                                   min="1"
+                                   value={pieceEntry.quantity}
+                                   onChange={(e) => {
+                                     const value = parseInt(e.target.value) || 0;
+                                     if (value <= 0) {
+                                       removeProduct(form.products.indexOf(pieceEntry));
+                                     } else {
+                                       handleQuantityChange(form.products.indexOf(pieceEntry), value.toString());
+                                     }
+                                   }}
+                                 />
+                                 <button
+                                   type="button"
+                                   className="qty-btn plus"
+                                   onClick={() => handleQuantityChange(form.products.indexOf(pieceEntry), (pieceEntry.quantity + 1).toString())}
+                                 >
+                                   +
+                                 </button>
+                               </div>
+                             ) : null;
+                           })()}
+                         </div>
+                         {Array.isArray(productInfo.pricing.perPackage) ? (
+                           productInfo.pricing.perPackage.map(pkg => {
+                             const packageEntry = form.products.find(p => p.product === productName && p.pricingType === 'perPackage' && p.packageQuantity === pkg.quantity);
+                             return (
+                               <div key={pkg.quantity} className="pricing-row">
+                                 <button
+                                   type="button"
+                                   className={`pricing-btn ${packageEntry ? 'selected' : ''}`}
+                                   onClick={() => {
+                                     const existingIndex = form.products.findIndex(p => p.product === productName && p.pricingType === 'perPackage' && p.packageQuantity === pkg.quantity);
+                                     if (existingIndex >= 0) {
+                                       const currentQty = form.products[existingIndex].quantity;
+                                       if (currentQty > 1) {
+                                         handleQuantityChange(existingIndex, (currentQty - 1).toString());
+                                       } else {
+                                         removeProduct(existingIndex);
+                                       }
+                                     } else {
+                                       const updatedProducts = [...form.products, {
+                                         product: productName,
+                                         quantity: 1,
+                                         pricingType: 'perPackage',
+                                         packageQuantity: pkg.quantity
+                                       }];
+                                       const subtotal = calculateTotalPrice(updatedProducts);
+                                       setForm({ ...form, products: updatedProducts, totalPrice: subtotal });
+                                     }
+                                   }}
+                                 >
+                                   Per Case ({pkg.quantity} {productInfo.pricing.perPiece.unit}s): ₱{pkg.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                 </button>
+                                 {packageEntry ? (
+                                   <div className="inline-quantity-controls">
+                                     <button
+                                       type="button"
+                                       className="qty-btn minus"
+                                       onClick={() => {
+                                         const currentQty = packageEntry.quantity;
+                                         if (currentQty > 1) {
+                                           handleQuantityChange(form.products.indexOf(packageEntry), (currentQty - 1).toString());
+                                         } else {
+                                           removeProduct(form.products.indexOf(packageEntry));
+                                         }
+                                       }}
+                                     >
+                                       -
+                                     </button>
+                                     <input
+                                       type="number"
+                                       className="quantity-input"
+                                       min="1"
+                                       value={packageEntry.quantity}
+                                       onChange={(e) => {
+                                         const value = parseInt(e.target.value) || 0;
+                                         if (value <= 0) {
+                                           removeProduct(form.products.indexOf(packageEntry));
+                                         } else {
+                                           handleQuantityChange(form.products.indexOf(packageEntry), value.toString());
+                                         }
+                                       }}
+                                     />
+                                     <button
+                                       type="button"
+                                       className="qty-btn plus"
+                                       onClick={() => handleQuantityChange(form.products.indexOf(packageEntry), (packageEntry.quantity + 1).toString())}
+                                     >
+                                       +
+                                     </button>
+                                   </div>
+                                 ) : null}
+                               </div>
+                             );
+                           })
+                         ) : (
+                           (() => {
+                             const packageEntry = form.products.find(p => p.product === productName && p.pricingType === 'perPackage');
+                             return (
+                               <div className="pricing-row">
+                                 <button
+                                   type="button"
+                                   className={`pricing-btn ${packageEntry ? 'selected' : ''}`}
+                                   onClick={() => {
+                                     const existingIndex = form.products.findIndex(p => p.product === productName && p.pricingType === 'perPackage');
+                                     if (existingIndex >= 0) {
+                                       const currentQty = form.products[existingIndex].quantity;
+                                       if (currentQty > 1) {
+                                         handleQuantityChange(existingIndex, (currentQty - 1).toString());
+                                       } else {
+                                         removeProduct(existingIndex);
+                                       }
+                                     } else {
+                                       const updatedProducts = [...form.products, {
+                                         product: productName,
+                                         quantity: 1,
+                                         pricingType: 'perPackage',
+                                         packageQuantity: productInfo.packaging.quantity
+                                       }];
+                                       const subtotal = calculateTotalPrice(updatedProducts);
+                                       setForm({ ...form, products: updatedProducts, totalPrice: subtotal });
+                                     }
+                                   }}
+                                 >
+                                   Per {productInfo.packaging.name}: ₱{productInfo.pricing.perPackage.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                 </button>
+                                 {packageEntry ? (
+                                   <div className="inline-quantity-controls">
+                                     <button
+                                       type="button"
+                                       className="qty-btn minus"
+                                       onClick={() => {
+                                         const currentQty = packageEntry.quantity;
+                                         if (currentQty > 1) {
+                                           handleQuantityChange(form.products.indexOf(packageEntry), (currentQty - 1).toString());
+                                         } else {
+                                           removeProduct(form.products.indexOf(packageEntry));
+                                         }
+                                       }}
+                                     >
+                                       -
+                                     </button>
+                                     <input
+                                       type="number"
+                                       className="quantity-input"
+                                       min="1"
+                                       value={packageEntry.quantity}
+                                       onChange={(e) => {
+                                         const value = parseInt(e.target.value) || 0;
+                                         if (value <= 0) {
+                                           removeProduct(form.products.indexOf(packageEntry));
+                                         } else {
+                                           handleQuantityChange(form.products.indexOf(packageEntry), value.toString());
+                                         }
+                                       }}
+                                     />
+                                     <button
+                                       type="button"
+                                       className="qty-btn plus"
+                                       onClick={() => handleQuantityChange(form.products.indexOf(packageEntry), (packageEntry.quantity + 1).toString())}
+                                     >
+                                       +
+                                     </button>
+                                   </div>
+                                 ) : null}
+                               </div>
+                             );
+                           })()
                          )}
                        </div>
-                     </div>
-                     <div className="quantity-display">
-                       {(() => {
-                         const pieceEntry = form.products.find(p => p.product === productName && p.pricingType === 'perPiece');
-                         const packageEntries = form.products.filter(p => p.product === productName && p.pricingType === 'perPackage');
-
-                         return (
-                           <>
-                             {pieceEntry && (
-                               <div className="quantity-item">
-                                 <span>Per {productInfo.pricing.perPiece.unit}:</span>
-                                 <div className="quantity-controls">
-                                   <button
-                                     type="button"
-                                     className="qty-btn minus"
-                                     onClick={() => {
-                                       const currentQty = pieceEntry.quantity;
-                                       if (currentQty > 1) {
-                                         handleQuantityChange(form.products.indexOf(pieceEntry), (currentQty - 1).toString());
-                                       } else {
-                                         removeProduct(form.products.indexOf(pieceEntry));
-                                       }
-                                     }}
-                                   >
-                                     -
-                                   </button>
-                                   <span className="quantity-value">{pieceEntry.quantity}</span>
-                                   <button
-                                     type="button"
-                                     className="qty-btn plus"
-                                     onClick={() => handleQuantityChange(form.products.indexOf(pieceEntry), (pieceEntry.quantity + 1).toString())}
-                                   >
-                                     +
-                                   </button>
-                                 </div>
-                               </div>
-                             )}
-                             {packageEntries.map(entry => (
-                               <div key={entry.packageQuantity} className="quantity-item">
-                                 <span>
-                                   {Array.isArray(productInfo.packaging)
-                                     ? `${entry.packageQuantity} ${productInfo.pricing.perPiece.unit}s`
-                                     : productInfo.packaging.name}:
-                                 </span>
-                                 <div className="quantity-controls">
-                                   <button
-                                     type="button"
-                                     className="qty-btn minus"
-                                     onClick={() => {
-                                       const currentQty = entry.quantity;
-                                       if (currentQty > 1) {
-                                         handleQuantityChange(form.products.indexOf(entry), (currentQty - 1).toString());
-                                       } else {
-                                         removeProduct(form.products.indexOf(entry));
-                                       }
-                                     }}
-                                   >
-                                     -
-                                   </button>
-                                   <span className="quantity-value">{entry.quantity}</span>
-                                   <button
-                                     type="button"
-                                     className="qty-btn plus"
-                                     onClick={() => handleQuantityChange(form.products.indexOf(entry), (entry.quantity + 1).toString())}
-                                   >
-                                     +
-                                   </button>
-                                 </div>
-                               </div>
-                             ))}
-                           </>
-                         );
-                       })()}
                      </div>
                    </div>
                  ))}
@@ -1378,10 +1685,7 @@ const POMonitoring = () => {
                         ))}
                       </select>
                     </div>
-                    <div className="input-group">
-                      <label>Customer Name</label>
-                      <input name="customerName" placeholder="Enter Customer Name" value={editForm.customerName} onChange={handleEditInputChange} required />
-                    </div>
+
                     <div className="input-group">
                       <label>Address</label>
                       <input name="address" placeholder="Enter Delivery Address" value={editForm.address} onChange={handleEditInputChange} required />
@@ -1576,7 +1880,7 @@ const POMonitoring = () => {
                   <h3>Delivery</h3>
                   <div className="delivery-details">
                     <p><strong>Requested date:</strong> {selectedPO.deliveryDate}</p>
-                    <p><strong>{selectedPO.customerName}</strong></p>
+                    <p><strong>{selectedPO.companyName}</strong></p>
                     <p>{selectedPO.address || 'Address not provided'}</p>
                   </div>
                 </div>
@@ -1584,7 +1888,7 @@ const POMonitoring = () => {
                 <div className="info-box po-details">
                   <h3>Purchase Order Details</h3>
                   <div className="po-details-content">
-                    <p><strong>Requisitioner:</strong> {selectedPO.customerName}</p>
+                    <p><strong>Requisitioner:</strong> {selectedPO.companyName}</p>
                     <p><strong>Order:</strong> {selectedPO.customId}</p>
                     <p><strong>Date:</strong> {selectedPO.poDate}</p>
                     <p><strong>Contact:</strong> {selectedPO.contact || 'Not provided'}</p>
@@ -1609,7 +1913,6 @@ const POMonitoring = () => {
                   <tr>
                     <th>Item</th>
                     <th>Description</th>
-                    <th>External Code</th>
                     <th>Quantity</th>
                     <th>Unit</th>
                     <th>Delivery</th>
@@ -1642,7 +1945,6 @@ const POMonitoring = () => {
                       <tr key={index}>
                         <td>{index + 1}</td>
                         <td>{item.product}</td>
-                        <td>-</td>
                         <td>{item.quantity}</td>
                         <td>{unit}</td>
                         <td>{selectedPO.deliveryDate}</td>
@@ -1689,6 +1991,13 @@ const POMonitoring = () => {
                               timestamp: new Date(),
                               action: 'PO Completed and Confirmed',
                               details: `PO ${selectedPO.customId} delivery confirmed by admin and moved to history`
+                            });
+
+                            // Add to completed-pos collection
+                            await addDoc(collection(db, 'completed-pos'), {
+                              ...selectedPO,
+                              completedAt: new Date(),
+                              completedBy: 'Admin' // You can modify this to get the actual admin name
                             });
 
                             // Update PO status to completed

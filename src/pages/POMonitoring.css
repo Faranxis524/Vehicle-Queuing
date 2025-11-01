@@ -414,9 +414,8 @@
   border: 1px solid #e5e7eb;
   border-radius: 12px;
   padding: 20px;
-  display: flex;
+  display: column;
   justify-content: space-between;
-  align-items: center;
   transition: box-shadow 0.2s, border-color 0.2s;
 }
 
@@ -443,6 +442,76 @@
   margin: 0;
   color: #6b7280;
   font-size: 12px;
+}
+
+.pricing-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+
+.pricing-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.pricing-btn {
+  flex: 1;
+  padding: 8px 12px;
+  border: 2px solid transparent;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.05);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  outline: 2px solid rgba(59, 130, 246, 0.3);
+}
+
+.pricing-btn:hover {
+  background: rgba(255,255,255,0.08);
+  outline-color: rgba(59, 130, 246, 0.5);
+}
+
+.pricing-btn.selected {
+  background: rgba(59, 130, 246, 0.1);
+  border-color: rgba(59, 130, 246, 0.4);
+  outline-color: rgba(59, 130, 246, 0.8);
+}
+
+.inline-quantity-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.inline-quantity-controls .qty-btn {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.inline-quantity-controls .quantity-input {
+  width: 50px;
+  height: 24px;
+  padding: 0 4px;
+  text-align: center;
+  font-size: 12px;
+  border-radius: 4px;
+  border: 1px solid rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.05);
+  color: var(--text);
 }
 
 .quantity-controls {

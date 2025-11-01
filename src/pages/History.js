@@ -48,6 +48,7 @@ const History = () => {
   const [history, setHistory] = useState([]);
   const [completedPOs, setCompletedPOs] = useState([]);
   const [selectedPO, setSelectedPO] = useState(null);
+  const [companyFilter, setCompanyFilter] = useState('All');
 
   useEffect(() => {
     const q = query(collection(db, 'history'), orderBy('timestamp', 'desc'));
@@ -62,7 +63,7 @@ const History = () => {
   }, []);
 
   useEffect(() => {
-    const q = query(collection(db, 'completed-pos'), orderBy('completedAt', 'desc'));
+    const q = query(collection(db, 'completed-pos'), orderBy('deliveryDate', 'desc'));
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const completedData = [];
       querySnapshot.forEach((doc) => {
@@ -73,6 +74,14 @@ const History = () => {
     return unsubscribe;
   }, []);
 
+  // Get unique company names for filter dropdown
+  const uniqueCompanies = ['All', ...new Set(completedPOs.map(po => po.companyName).filter(Boolean))];
+
+  // Filter completed POs based on selected company
+  const filteredPOs = companyFilter === 'All'
+    ? completedPOs
+    : completedPOs.filter(po => po.companyName === companyFilter);
+
   return (
     <div className="history">
       <h1>Completed Purchase Orders</h1>
@@ -80,23 +89,39 @@ const History = () => {
       {completedPOs.length === 0 ? (
         <p>No completed POs yet.</p>
       ) : (
-        <div className="completed-pos-grid">
-          {completedPOs.map(po => (
-            <div key={po.id} className="po-card completed-po-card" onClick={() => setSelectedPO(po)}>
-              <div className="po-header">
-                <span className="po-number">PO {po.customId}</span>
-                <span className="po-status completed">Completed</span>
+        <>
+          <div className="filter-section">
+            <label htmlFor="company-filter">Filter by Company:</label>
+            <select
+              id="company-filter"
+              value={companyFilter}
+              onChange={(e) => setCompanyFilter(e.target.value)}
+              className="company-filter-dropdown"
+            >
+              {uniqueCompanies.map(company => (
+                <option key={company} value={company}>{company}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="completed-pos-grid">
+            {filteredPOs.map(po => (
+              <div key={po.id} className="po-card completed-po-card" onClick={() => setSelectedPO(po)}>
+                <div className="po-header">
+                  <span className="po-number">PO {po.customId}</span>
+                  <span className="po-status completed">Completed</span>
+                </div>
+                <div className="po-summary">
+                  <p><strong>{po.companyName}</strong></p>
+                  <p>{po.customerName}</p>
+                  <p>{po.location}</p>
+                  <p>{po.deliveryDate}</p>
+                  <p><strong>Completed: {po.completedAt.toDate().toLocaleDateString()}</strong></p>
+                </div>
               </div>
-              <div className="po-summary">
-                <p><strong>{po.companyName}</strong></p>
-                <p>{po.customerName}</p>
-                <p>{po.location}</p>
-                <p>{po.deliveryDate}</p>
-                <p><strong>Completed: {po.completedAt.toDate().toLocaleDateString()}</strong></p>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        </>
       )}
 
       {selectedPO && (

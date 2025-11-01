@@ -1,9 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import './Sidebar.css';
 
 const Sidebar = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { logout } = useAuth();
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
 
   useEffect(() => {
@@ -14,7 +17,8 @@ const Sidebar = () => {
   }, [theme]);
 
   const handleLogout = () => {
-    // Redirect to Central Login; replace history to prevent back navigation into dashboard
+    // Logout and redirect to Central Login; replace history to prevent back navigation into dashboard
+    logout();
     navigate('/login', { replace: true });
   };
 
@@ -27,10 +31,10 @@ const Sidebar = () => {
       <div>
         <h2>Admin Dashboard</h2>
         <ul>
-          <li><Link to="/po-monitoring">PO Monitoring</Link></li>
-          <li><Link to="/vehicle-monitoring">Vehicle Monitoring</Link></li>
-          <li><Link to="/history">History</Link></li>
-          <li><Link to="/driver-info">Driver Info</Link></li>
+          <li><Link to="/po-monitoring" className={location.pathname === '/po-monitoring' ? 'active' : ''}>PO Monitoring</Link></li>
+          <li><Link to="/vehicle-monitoring" className={location.pathname === '/vehicle-monitoring' ? 'active' : ''}>Vehicle Monitoring</Link></li>
+          <li><Link to="/history" className={location.pathname === '/history' ? 'active' : ''}>History</Link></li>
+          <li><Link to="/driver-info" className={location.pathname === '/driver-info' ? 'active' : ''}>Driver Info</Link></li>
         </ul>
       </div>
       <div className="sidebar-footer">

@@ -1,16 +1,37 @@
 import React, { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Outlet } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Outlet, Navigate } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import ErrorBoundary from './components/ErrorBoundary';
+import ProtectedRoute from './components/ProtectedRoute';
 import { VehicleProvider } from './contexts/VehicleContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import POMonitoring from './pages/POMonitoring';
 import VehicleMonitoring from './pages/VehicleMonitoring';
 import History from './pages/History';
 import DriverInfo from './pages/DriverInfo';
-import DriverLogin from './pages/DriverLogin';
+
 import DriverDashboard from './pages/DriverDashboard';
 import CentralLogin from './pages/CentralLogin';
 import './App.css';
+
+// Component to handle root route redirection
+const RootRedirect = () => {
+  const { isAuthenticated, userType } = useAuth();
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  // Redirect based on user type
+  if (userType === 'admin') {
+    return <Navigate to="/po-monitoring" replace />;
+  } else if (userType === 'driver') {
+    return <Navigate to="/driver-dashboard" replace />;
+  }
+
+  // Fallback to login
+  return <Navigate to="/login" replace />;
+};
 
 function ShellLayout() {
   return (
@@ -32,27 +53,38 @@ function App() {
   }, []);
 
   return (
-    <VehicleProvider>
-      <Router>
-        <ErrorBoundary>
-          <Routes>
-            {/* Auth routes (no dashboard shell) */}
-            <Route path="/login" element={<CentralLogin />} />
-            <Route path="/driver-login" element={<DriverLogin />} />
-            <Route path="/driver-dashboard" element={<DriverDashboard />} />
+    <AuthProvider>
+      <VehicleProvider>
+        <Router>
+          <ErrorBoundary>
+            <Routes>
+              {/* Auth routes (no dashboard shell) */}
+              <Route path="/login" element={<CentralLogin />} />
+              <Route path="/driver-dashboard" element={
+                <ProtectedRoute requiredUserType="driver">
+                  <DriverDashboard />
+                </ProtectedRoute>
+              } />
 
-            {/* App routes with dashboard shell */}
-            <Route element={<ShellLayout />}>
-              <Route path="/po-monitoring" element={<POMonitoring />} />
-              <Route path="/vehicle-monitoring" element={<VehicleMonitoring />} />
-              <Route path="/history" element={<History />} />
-              <Route path="/driver-info" element={<DriverInfo />} />
-              <Route path="/" element={<POMonitoring />} />
-            </Route>
-          </Routes>
-        </ErrorBoundary>
-      </Router>
-    </VehicleProvider>
+              {/* Root route - redirects based on auth status */}
+              <Route path="/" element={<RootRedirect />} />
+
+              {/* App routes with dashboard shell - protected for admin */}
+              <Route element={
+                <ProtectedRoute requiredUserType="admin">
+                  <ShellLayout />
+                </ProtectedRoute>
+              }>
+                <Route path="/po-monitoring" element={<POMonitoring />} />
+                <Route path="/vehicle-monitoring" element={<VehicleMonitoring />} />
+                <Route path="/history" element={<History />} />
+                <Route path="/driver-info" element={<DriverInfo />} />
+              </Route>
+            </Routes>
+          </ErrorBoundary>
+        </Router>
+      </VehicleProvider>
+    </AuthProvider>
   );
 }
 

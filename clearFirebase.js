@@ -1,5 +1,5 @@
 const { initializeApp } = require('firebase/app');
-const { getFirestore, collection, getDocs, deleteDoc, doc } = require('firebase/firestore');
+const { getFirestore, collection, getDocs, deleteDoc, doc, addDoc } = require('firebase/firestore');
 
 // Your Firebase config
 const firebaseConfig = {
@@ -24,10 +24,10 @@ const clearCollection = async (collectionName) => {
 
 const initializeDrivers = async () => {
   const drivers = [
-    { name: 'John Doe', vehicle: 'Isuzu Flexy Small', confirmed: false, status: 'Not Set' },
-    { name: 'Jane Smith', vehicle: 'Isuzu Flexy Big', confirmed: false, status: 'Not Set' },
-    { name: 'Bob Johnson', vehicle: 'Isuzu Truck', confirmed: false, status: 'Not Set' },
-    { name: 'Alice Brown', vehicle: 'H100', confirmed: false, status: 'Not Set' }
+    { name: 'Fernando Besa', vehicle: 'Isuzu Flexy Small', confirmed: true, status: 'Available' },
+    { name: 'Joseph Allan Saldivar', vehicle: 'Isuzu Flexy Big', confirmed: true, status: 'Available' },
+    { name: 'Randy Maduro', vehicle: 'Isuzu Truck', confirmed: true, status: 'Available' },
+    { name: 'Adrian Silao', vehicle: 'H100', confirmed: true, status: 'Available' }
   ];
 
   for (const driver of drivers) {

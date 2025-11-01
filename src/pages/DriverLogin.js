@@ -31,6 +31,7 @@ const DriverLogin = () => {
       });
 
       // Derive driver entries from initialized vehicles, then merge by unique name
+      // Only include the 4 authorized drivers
       const derivedFromVehicles = (vehicles || [])
         .map(v => ({
           id: `veh-${v.id}`,
@@ -39,11 +40,11 @@ const DriverLogin = () => {
           confirmed: true,
           status: v.status || 'Available'
         }))
-        .filter(d => d.name);
+        .filter(d => d.name && ['Randy Maduro', 'Adrian Silao', 'Fernando Besa', 'Joseph Allan Saldivar'].includes(d.name));
 
       const existingByName = new Set(driversData.map(d => (d.name || '').toLowerCase()));
       const merged = [
-        ...driversData,
+        ...driversData.filter(d => ['Randy Maduro', 'Adrian Silao', 'Fernando Besa', 'Joseph Allan Saldivar'].includes(d.name)),
         ...derivedFromVehicles.filter(d => !existingByName.has((d.name || '').toLowerCase()))
       ];
 
