@@ -3,6 +3,8 @@ import { collection, onSnapshot, query, orderBy, doc, updateDoc, addDoc, getDocs
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db } from '../firebase';
 import { useVehicles } from '../contexts/VehicleContext';
+import NotificationDialog from '../components/NotificationDialog';
+import ConfirmDialog from '../components/ConfirmDialog';
 import './DriverDashboard.css';
 
 const products = {
@@ -55,6 +57,8 @@ const DriverDashboard = () => {
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
   const [selectedPO, setSelectedPO] = useState(null);
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [notification, setNotification] = useState(null);
+  const [confirmDialog, setConfirmDialog] = useState(null);
 
   useEffect(() => {
     const value = theme === 'light' ? 'light' : 'dark';
@@ -176,7 +180,11 @@ const DriverDashboard = () => {
       const assignedPOs = pos.filter(po => po.assignedDriver === loggedInDriver.name || po.assignedTruck === loggedInDriver.vehicle);
       const allDone = assignedPOs.every(po => po.deliveryStatus === 'done');
       if (!allDone) {
-        alert('You cannot change your status from In-transit until all assigned POs are marked as done.');
+        setNotification({
+          type: 'error',
+          title: 'Cannot Change Status',
+          message: 'You cannot change your status from In-transit until all assigned POs are marked as done.'
+        });
         setUpdatingStatus(false);
         return;
       }
@@ -268,10 +276,21 @@ const DriverDashboard = () => {
       });
 
       // Show success feedback
-      alert(`Status updated to ${status} successfully!`);
+      setNotification({
+        type: 'success',
+        title: 'Status Updated',
+        message: `Status updated to ${status} successfully!`,
+        autoClose: true,
+        autoCloseDelay: 3000,
+        showCloseButton: false
+      });
     } catch (error) {
       console.error('Status update failed:', error);
-      alert('Failed to update status. Please try again.');
+      setNotification({
+        type: 'error',
+        title: 'Update Failed',
+        message: 'Failed to update status. Please try again.'
+      });
     } finally {
       setUpdatingStatus(false);
     }
@@ -445,12 +464,19 @@ const DriverDashboard = () => {
                             const nextStatus = po.deliveryStatus === 'pending' ? 'departure' : po.deliveryStatus === 'departure' ? 'ongoing' : 'done';
                             if (nextStatus === 'done') {
                               if (loggedInDriver.status !== 'In-transit') {
-                                alert('You can only mark POs as done when your status is In-transit.');
+                                setNotification({
+                                  type: 'warning',
+                                  title: 'Cannot Mark as Done',
+                                  message: 'You can only mark POs as done when your status is In-transit.'
+                                });
                                 return;
                               }
-                              if (window.confirm('Warning: Marking this PO as done cannot be undone and will move it to History. Continue?')) {
-                                updateDeliveryStatus(po.id, nextStatus);
-                              }
+                              setConfirmDialog({
+                                title: 'Mark PO as Done',
+                                message: 'Warning: Marking this PO as done cannot be undone and will move it to History. Continue?',
+                                type: 'warning',
+                                onConfirm: () => updateDeliveryStatus(po.id, nextStatus)
+                              });
                             } else {
                               updateDeliveryStatus(po.id, nextStatus);
                             }
@@ -595,6 +621,29 @@ const DriverDashboard = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {notification && (
+        <NotificationDialog
+          isOpen={!!notification}
+          onClose={() => setNotification(null)}
+          type={notification.type}
+          title={notification.title}
+          message={notification.message}
+          autoClose={notification.autoClose}
+          autoCloseDelay={notification.autoCloseDelay}
+        />
+      )}
+
+      {confirmDialog && (
+        <ConfirmDialog
+          isOpen={!!confirmDialog}
+          onClose={() => setConfirmDialog(null)}
+          onConfirm={confirmDialog.onConfirm}
+          title={confirmDialog.title}
+          message={confirmDialog.message}
+          type={confirmDialog.type}
+        />
       )}
     </div>
   );

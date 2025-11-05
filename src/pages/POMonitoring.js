@@ -2,6 +2,8 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { collection, addDoc, onSnapshot, doc, deleteDoc, query, orderBy, updateDoc, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useVehicles } from '../contexts/VehicleContext';
+import NotificationDialog from '../components/NotificationDialog';
+import ConfirmDialog from '../components/ConfirmDialog';
 import './POMonitoring.css';
 
 const products = {
@@ -113,6 +115,8 @@ const POMonitoring = () => {
   const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [notification, setNotification] = useState(null);
+  const [confirmDialog, setConfirmDialog] = useState(null);
   const [editForm, setEditForm] = useState({
     poNumber: '',
     companyName: '',
@@ -186,7 +190,11 @@ const POMonitoring = () => {
       },
       (error) => {
         console.error('Error fetching POs:', error);
-        alert('Failed to load POs. Please refresh the page.');
+        setNotification({
+          type: 'error',
+          title: 'Loading Error',
+          message: 'Failed to load POs. Please refresh the page.'
+        });
       }
     );
     return unsubscribe;
@@ -655,7 +663,12 @@ const POMonitoring = () => {
 
   const handleSaveUpdate = async () => {
     if (!editForm.poNumber || !editForm.companyName || !editForm.poDate || !editForm.location || !editForm.deliveryDate || !editForm.address || editForm.products.length === 0 || editForm.products.some(p => !p.product || p.quantity <= 0 || !p.pricingType)) {
-      alert('Please fill all required fields with valid data.');
+      setNotification({
+        type: 'error',
+        title: 'Missing Information',
+        message: 'Please fill all required fields with valid data.',
+        showCloseButton: true
+      });
       return;
     }
 
@@ -696,10 +709,33 @@ const POMonitoring = () => {
 
       setIsEditing(false);
       setShowModal(false);
-      alert('PO updated successfully! Load rebalancing has been performed.');
+      setNotification({
+        type: 'success',
+        title: 'PO Updated',
+        message: 'PO updated successfully! Load rebalancing has been performed.',
+        autoClose: true,
+        autoCloseDelay: 3000,
+        showCloseButton: false
+      });
+
+      // Show notification for new PO creation
+      setTimeout(() => {
+        setNotification({
+          type: 'info',
+          title: 'New Purchase Order Created',
+          message: `PO ${selectedPO.customId} has been successfully created and is ready for processing.`,
+          autoClose: true,
+          autoCloseDelay: 4000,
+          showCloseButton: false
+        });
+      }, 3500);
     } catch (error) {
       console.error('Error updating PO:', error);
-      alert('Failed to update PO. Please try again.');
+      setNotification({
+        type: 'error',
+        title: 'Update Failed',
+        message: 'Failed to update PO. Please try again.'
+      });
     }
   };
 
@@ -710,7 +746,12 @@ const POMonitoring = () => {
     if (form.phone.trim()) {
       const phoneValidation = validatePhilippinePhoneNumber(form.phone);
       if (!phoneValidation.isValid) {
-        alert(phoneValidation.error);
+        setNotification({
+          type: 'error',
+          title: 'Invalid Phone Number',
+          message: phoneValidation.error,
+          showCloseButton: true
+        });
         return;
       }
     }
@@ -718,12 +759,22 @@ const POMonitoring = () => {
     // Validate delivery date
     const deliveryValidation = validateDeliveryDate(form.deliveryDate, form.poDate);
     if (!deliveryValidation.isValid) {
-      alert(deliveryValidation.error);
+      setNotification({
+        type: 'error',
+        title: 'Invalid Delivery Date',
+        message: deliveryValidation.error,
+        showCloseButton: true
+      });
       return;
     }
 
     if (!form.poNumber || !form.companyName || !form.poDate || !form.location || !form.deliveryDate || !form.address || form.products.length === 0 || form.products.some(p => !p.product || p.quantity <= 0 || !p.pricingType)) {
-      alert('Please fill all required fields with valid data.');
+      setNotification({
+        type: 'error',
+        title: 'Missing Information',
+        message: 'Please fill all required fields with valid data.',
+        showCloseButton: true
+      });
       return;
     }
 
@@ -878,14 +929,22 @@ const POMonitoring = () => {
           // Hard guard: if the order exceeds the capacity of every vehicle, stop and show an error
           const maxCapacity = Math.max(...vehicles.map(v => v.capacity));
           if (newPO.load > maxCapacity) {
-            alert('This order exceeds the maximum load capacity of any available vehicle. Please split the order into multiple POs.');
+            setNotification({
+              type: 'error',
+              title: 'Order Too Large',
+              message: 'This order exceeds the maximum load capacity of any available vehicle. Please split the order into multiple POs.'
+            });
             return;
           }
-
+   
           // Check if location is in a defined cluster
           const poCluster = findCluster(newPO.location);
           if (!poCluster) {
-            alert('This location is not assigned to any cluster. Please select a valid location or contact an administrator.');
+            setNotification({
+              type: 'error',
+              title: 'Invalid Location',
+              message: 'This location is not assigned to any cluster. Please select a valid location or contact an administrator.'
+            });
             return;
           }
 
@@ -928,11 +987,23 @@ const POMonitoring = () => {
             const availableVehicles = allVehiclesForDate.filter(v => v.status === 'Available');
 
             if (unavailableDrivers.length > 0 && availableVehicles.length === 0) {
-              alert(`No suitable vehicles available in cluster ${clusterName}. All vehicles have drivers with status: ${unavailableDrivers.map(v => `${v.name} (${v.status})`).join(', ')}. Please check driver statuses or wait for drivers to become available. PO has been placed on hold.`);
+              setNotification({
+                type: 'warning',
+                title: 'PO Placed On Hold',
+                message: `No suitable vehicles available in cluster ${clusterName}. All vehicles have drivers with status: ${unavailableDrivers.map(v => `${v.name} (${v.status})`).join(', ')}. Please check driver statuses or wait for drivers to become available. PO has been placed on hold.`
+              });
             } else if (availableVehicles.length === 0) {
-              alert(`No suitable vehicles available in cluster ${clusterName} for this PO on the selected delivery date. Vehicles may be full or restricted to another cluster. PO has been placed on hold.`);
+              setNotification({
+                type: 'warning',
+                title: 'PO Placed On Hold',
+                message: `No suitable vehicles available in cluster ${clusterName} for this PO on the selected delivery date. Vehicles may be full or restricted to another cluster. PO has been placed on hold.`
+              });
             } else {
-              alert('No suitable vehicle available for this PO. PO has been placed on hold.');
+              setNotification({
+                type: 'warning',
+                title: 'PO Placed On Hold',
+                message: 'No suitable vehicle available for this PO. PO has been placed on hold.'
+              });
             }
 
             // Log on-hold status
@@ -969,7 +1040,12 @@ const POMonitoring = () => {
           });
         } catch (error) {
           console.error('Error adding PO:', error);
-          alert('Failed to add PO. Please check your connection and try again.');
+          setNotification({
+            type: 'error',
+            title: 'Failed to Add PO',
+            message: 'Failed to add PO. Please check your connection and try again.',
+            showCloseButton: true
+          });
         } finally {
           setLoading(false);
         }
@@ -990,14 +1066,24 @@ const POMonitoring = () => {
       // Hard guard: if the order exceeds the capacity of every vehicle, stop and show an error
       const maxCapacity = Math.max(...vehicles.map(v => v.capacity));
       if (newPO.load > maxCapacity) {
-        alert('This order exceeds the maximum load capacity of any available vehicle. Please split the order into multiple POs.');
+        setNotification({
+          type: 'error',
+          title: 'Order Too Large',
+          message: 'This order exceeds the maximum load capacity of any available vehicle. Please split the order into multiple POs.',
+          showCloseButton: true
+        });
         return;
       }
 
       // Check if location is in a defined cluster
       const poCluster = findCluster(newPO.location);
       if (!poCluster) {
-        alert('This location is not assigned to any cluster. Please select a valid location or contact an administrator.');
+        setNotification({
+          type: 'error',
+          title: 'Invalid Location',
+          message: 'This location is not assigned to any cluster. Please select a valid location or contact an administrator.',
+          showCloseButton: true
+        });
         return;
       }
 
@@ -1040,11 +1126,26 @@ const POMonitoring = () => {
         const availableVehicles = allVehiclesForDate.filter(v => v.status === 'Available');
 
         if (unavailableDrivers.length > 0 && availableVehicles.length === 0) {
-          alert(`No suitable vehicles available in cluster ${clusterName}. All vehicles have drivers with status: ${unavailableDrivers.map(v => `${v.name} (${v.status})`).join(', ')}. Please check driver statuses or wait for drivers to become available. PO has been placed on hold.`);
+          setNotification({
+            type: 'warning',
+            title: 'PO Placed On Hold',
+            message: `No suitable vehicles available in cluster ${clusterName}. All vehicles have drivers with status: ${unavailableDrivers.map(v => `${v.name} (${v.status})`).join(', ')}. Please check driver statuses or wait for drivers to become available. PO has been placed on hold.`,
+            showCloseButton: true
+          });
         } else if (availableVehicles.length === 0) {
-          alert(`No suitable vehicles available in cluster ${clusterName} for this PO on the selected delivery date. Vehicles may be full or restricted to another cluster. PO has been placed on hold.`);
+          setNotification({
+            type: 'warning',
+            title: 'PO Placed On Hold',
+            message: `No suitable vehicles available in cluster ${clusterName} for this PO on the selected delivery date. Vehicles may be full or restricted to another cluster. PO has been placed on hold.`,
+            showCloseButton: true
+          });
         } else {
-          alert('No suitable vehicle available for this PO. PO has been placed on hold.');
+          setNotification({
+            type: 'warning',
+            title: 'PO Placed On Hold',
+            message: 'No suitable vehicle available for this PO. PO has been placed on hold.',
+            showCloseButton: true
+          });
         }
 
         // Log on-hold status
@@ -1079,9 +1180,24 @@ const POMonitoring = () => {
         action: 'Added PO',
         details: `PO ${newPO.customId}: Company: ${newPO.companyName}, Date: ${newPO.poDate}, Location: ${newPO.location}, Delivery: ${newPO.deliveryDate}, Products: ${productsStr}, Total: ${newPO.totalPrice}`
       });
+
+      // Show notification for new PO creation
+      setNotification({
+        type: 'success',
+        title: 'Purchase Order Created',
+        message: `PO ${newPO.customId} has been successfully created and ${assignedVehicle ? `assigned to ${assignedVehicle}` : 'placed on hold pending vehicle assignment'}.`,
+        autoClose: true,
+        autoCloseDelay: 5000,
+        showCloseButton: false
+      });
     } catch (error) {
       console.error('Error adding PO:', error);
-      alert('Failed to add PO. Please check your connection and try again.');
+      setNotification({
+        type: 'error',
+        title: 'Failed to Add PO',
+        message: 'Failed to add PO. Please check your connection and try again.',
+        showCloseButton: true
+      });
     } finally {
       setLoading(false);
     }
@@ -1113,42 +1229,64 @@ const POMonitoring = () => {
   };
 
   const handleDelete = async () => {
-    if (window.confirm('Are you sure you want to delete this PO?')) {
-      // If PO was assigned to a vehicle, update the vehicle's load
-      if (selectedPO.assignedTruck) {
-        const vehicle = vehicles.find(v => v.name === selectedPO.assignedTruck);
-        if (vehicle) {
-          const loadToRemove = calculateLoad(selectedPO);
-          updateVehicle(vehicle.id, {
-            currentLoad: Math.max(0, vehicle.currentLoad - loadToRemove),
-            assignedPOs: (vehicle.assignedPOs || []).filter(poId => poId !== selectedPO.id)
-          });
+    setConfirmDialog({
+      title: 'Delete Purchase Order',
+      message: `Are you sure you want to delete PO ${selectedPO.customId}? This action cannot be undone.`,
+      type: 'danger',
+      onConfirm: async () => {
+        // If PO was assigned to a vehicle, update the vehicle's load
+        if (selectedPO.assignedTruck) {
+          const vehicle = vehicles.find(v => v.name === selectedPO.assignedTruck);
+          if (vehicle) {
+            const loadToRemove = calculateLoad(selectedPO);
+            updateVehicle(vehicle.id, {
+              currentLoad: Math.max(0, vehicle.currentLoad - loadToRemove),
+              assignedPOs: (vehicle.assignedPOs || []).filter(poId => poId !== selectedPO.id)
+            });
+          }
         }
-      }
 
-      await deleteDoc(doc(db, 'pos', selectedPO.id));
-      setShowModal(false);
-      // Log to history
-      const productsStr = selectedPO.products.map(item => `${item.product}: ${item.quantity}`).join(', ');
-      await addDoc(collection(db, 'history'), {
-        timestamp: new Date(),
-        action: 'Deleted PO',
-        details: `PO ${selectedPO.customId}: Company: ${selectedPO.companyName}, Products: ${productsStr}`
-      });
-    }
+        await deleteDoc(doc(db, 'pos', selectedPO.id));
+        setShowModal(false);
+        // Log to history
+        const productsStr = selectedPO.products.map(item => `${item.product}: ${item.quantity}`).join(', ');
+        await addDoc(collection(db, 'history'), {
+          timestamp: new Date(),
+          action: 'Deleted PO',
+          details: `PO ${selectedPO.customId}: Company: ${selectedPO.companyName}, Products: ${productsStr}`
+        });
+      }
+    });
   };
 
   // Enhanced load rebalancing function with full recalculation and dimension compliance
   const handleRebalanceLoads = useCallback(async () => {
-    if (window.confirm('This will attempt to rebalance vehicle loads for better distribution using enhanced load management rules including dimension compliance. Continue?')) {
-      try {
-        const result = await rebalanceLoads(pos);
-        alert(result);
-      } catch (error) {
-        console.error('Rebalance error:', error);
-        alert('An error occurred during rebalancing. Please check the console for details.');
+    setConfirmDialog({
+      title: 'Rebalance Vehicle Loads',
+      message: 'This will attempt to rebalance vehicle loads for better distribution using enhanced load management rules including dimension compliance. This action cannot be undone.',
+      type: 'warning',
+      onConfirm: async () => {
+        try {
+          const result = await rebalanceLoads(pos);
+          setNotification({
+            type: 'success',
+            title: 'Rebalancing Complete',
+            message: result,
+            autoClose: true,
+            autoCloseDelay: 5000,
+            showCloseButton: false
+          });
+        } catch (error) {
+          console.error('Rebalance error:', error);
+          setNotification({
+            type: 'error',
+            title: 'Rebalancing Failed',
+            message: 'An error occurred during rebalancing. Please check the console for details.',
+            showCloseButton: true
+          });
+        }
       }
-    }
+    });
   }, [pos, rebalanceLoads]);
 
   const handleAssign = useCallback(async (vehicleId) => {
@@ -1160,20 +1298,35 @@ const POMonitoring = () => {
       const lockedCluster = getClusterForVehicleOnDate(vehicle, selectedPO.deliveryDate);
 
       if (lockedCluster && lockedCluster !== clusterName) {
-        alert(`Selected vehicle is already assigned to ${lockedCluster} on ${selectedPO.deliveryDate}. You cannot mix clusters on the same trip.`);
+        setNotification({
+          type: 'error',
+          title: 'Cluster Conflict',
+          message: `Selected vehicle is already assigned to ${lockedCluster} on ${selectedPO.deliveryDate}. You cannot mix clusters on the same trip.`,
+          showCloseButton: true
+        });
         return;
       }
 
       // Additional check: ensure the PO's location is in a valid cluster
       if (!clusterName) {
-        alert('This PO has an invalid location that is not assigned to any cluster. Please update the PO location first.');
+        setNotification({
+          type: 'error',
+          title: 'Invalid Location',
+          message: 'This PO has an invalid location that is not assigned to any cluster. Please update the PO location first.',
+          showCloseButton: true
+        });
         return;
       }
 
       if (vehicle.capacity - usedForDate >= load) {
         // Check driver status first
         if (vehicle.status !== 'Available') {
-          alert(`Cannot assign to ${vehicle.name}: Driver status is "${vehicle.status}". Vehicle is not available for delivery.`);
+          setNotification({
+            type: 'error',
+            title: 'Vehicle Unavailable',
+            message: `Cannot assign to ${vehicle.name}: Driver status is "${vehicle.status}". Vehicle is not available for delivery.`,
+            showCloseButton: true
+          });
           return;
         }
 
@@ -1206,7 +1359,12 @@ const POMonitoring = () => {
           details: `PO ${selectedPO.customId} assigned to ${vehicle.name} (${(utilizationAfter * 100).toFixed(1)}% utilization)`
         });
       } else {
-        alert('Selected vehicle does not have enough capacity for that delivery date.');
+        setNotification({
+          type: 'error',
+          title: 'Insufficient Capacity',
+          message: 'Selected vehicle does not have enough capacity for that delivery date.',
+          showCloseButton: true
+        });
       }
     }
   }, [selectedPO, vehicles, calculateLoad, getUsedLoadForVehicleOnDate, getClusterForVehicleOnDate, updateVehicle]);
@@ -2000,29 +2158,41 @@ const POMonitoring = () => {
                   <div className="action-buttons">
                     {selectedPO.status === 'delivered' && (
                       <button
-                        onClick={async () => {
-                          if (window.confirm('Confirm delivery completion? This will move the PO to History.')) {
-                            // Move to history collection
-                            await addDoc(collection(db, 'history'), {
-                              ...selectedPO,
-                              timestamp: new Date(),
-                              action: 'PO Completed and Confirmed',
-                              details: `PO ${selectedPO.customId} delivery confirmed by admin and moved to history`
-                            });
+                        onClick={() => {
+                          setConfirmDialog({
+                            title: 'Confirm Delivery Completion',
+                            message: 'This will move the PO to History and mark it as completed. This action cannot be undone.',
+                            type: 'warning',
+                            onConfirm: async () => {
+                              // Move to history collection
+                              await addDoc(collection(db, 'history'), {
+                                ...selectedPO,
+                                timestamp: new Date(),
+                                action: 'PO Completed and Confirmed',
+                                details: `PO ${selectedPO.customId} delivery confirmed by admin and moved to history`
+                              });
 
-                            // Add to completed-pos collection
-                            await addDoc(collection(db, 'completed-pos'), {
-                              ...selectedPO,
-                              completedAt: new Date(),
-                              completedBy: 'Admin' // You can modify this to get the actual admin name
-                            });
+                              // Add to completed-pos collection
+                              await addDoc(collection(db, 'completed-pos'), {
+                                ...selectedPO,
+                                completedAt: new Date(),
+                                completedBy: 'Admin' // You can modify this to get the actual admin name
+                              });
 
-                            // Update PO status to completed
-                            await updateDoc(doc(db, 'pos', selectedPO.id), { status: 'completed' });
+                              // Update PO status to completed
+                              await updateDoc(doc(db, 'pos', selectedPO.id), { status: 'completed' });
 
-                            setShowModal(false);
-                            alert('PO delivery confirmed and moved to History!');
-                          }
+                              setShowModal(false);
+                              setNotification({
+                                type: 'success',
+                                title: 'Delivery Confirmed',
+                                message: 'PO delivery confirmed and moved to History!',
+                                autoClose: true,
+                                autoCloseDelay: 3000,
+                                showCloseButton: false
+                              });
+                            }
+                          });
                         }}
                         className="confirm-btn"
                       >
@@ -2042,6 +2212,30 @@ const POMonitoring = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {notification && (
+        <NotificationDialog
+          isOpen={!!notification}
+          onClose={() => setNotification(null)}
+          type={notification.type}
+          title={notification.title}
+          message={notification.message}
+          autoClose={notification.autoClose}
+          autoCloseDelay={notification.autoCloseDelay}
+          showCloseButton={notification.showCloseButton}
+        />
+      )}
+
+      {confirmDialog && (
+        <ConfirmDialog
+          isOpen={!!confirmDialog}
+          onClose={() => setConfirmDialog(null)}
+          onConfirm={confirmDialog.onConfirm}
+          title={confirmDialog.title}
+          message={confirmDialog.message}
+          type={confirmDialog.type}
+        />
       )}
     </div>
   );

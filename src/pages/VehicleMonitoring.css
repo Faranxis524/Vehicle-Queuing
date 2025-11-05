@@ -18,6 +18,7 @@
 
 .vehicle-card { /* deprecated; using .card from App.css */ }
 
+/* Legacy modal styles - consider migrating to Dialog component */
 .modal {
   position: fixed;
   top: 0;
@@ -62,12 +63,27 @@
   font-weight: 600;
   letter-spacing: 0.2px;
   color: var(--text);
-  background: rgba(255,255,255,0.05);
+  background: rgba(0,0,0,0.05);
   cursor: pointer;
   transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease, border-color 150ms ease;
 }
 
 .modal-content button:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+  border-color: rgba(255,255,255,0.14);
+}
+
+.modal-content button.close-btn {
+  background: linear-gradient(180deg, var(--secondary), var(--secondary-dark));
+  border: 1px solid rgba(255,255,255,0.18);
+  color: white;
+  margin-top: 0;
+  margin-left: auto;
+  display: block;
+}
+
+.modal-content button.close-btn:hover {
   transform: translateY(-1px);
   box-shadow: var(--shadow);
   border-color: rgba(255,255,255,0.14);
@@ -97,7 +113,7 @@
   transform: translateY(-2px);
   box-shadow: 0 8px 25px rgba(0,0,0,0.15);
   border-color: rgba(255,255,255,0.2);
-  background: var(--card-bg-hover, rgba(255,255,255,0.05));
+  background: var(--card-bg-hover, rgba(0,0,0,0.05));
 }
 
 .po-header {

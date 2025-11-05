@@ -1,0 +1,86 @@
+.notification-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 16px 0 8px 0;
+}
+
+.notification-icon {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: bold;
+  background: var(--card-bg);
+  border: var(--border);
+}
+
+.notification-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.notification-title {
+  margin: 0 0 8px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.4;
+}
+
+.notification-message {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text);
+  line-height: 1.5;
+}
+
+/* Notification type specific styles */
+.dialog.success .notification-icon {
+  background: var(--success);
+  color: white;
+  border-color: var(--success);
+}
+
+.dialog.error .notification-icon {
+  background: var(--danger);
+  color: white;
+  border-color: var(--danger);
+}
+
+.dialog.warning .notification-icon {
+  background: var(--warning);
+  color: white;
+  border-color: var(--warning);
+}
+
+.dialog.default .notification-icon {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+/* Responsive adjustments */
+@media (max-width: 480px) {
+  .notification-content {
+    gap: 12px;
+  }
+
+  .notification-icon {
+    width: 28px;
+    height: 28px;
+    font-size: 14px;
+  }
+
+  .notification-title {
+    font-size: 15px;
+  }
+
+  .notification-message {
+    font-size: 13px;
+  }
+}

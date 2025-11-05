@@ -40,7 +40,7 @@
 }
 
 .sidebar a:hover {
-  background: rgba(255,255,255,0.06);
+  background: rgba(0,0,0,0.06);
 }
 
 .sidebar a.active {
@@ -63,7 +63,7 @@
   padding: 10px 12px;
   border-radius: 10px;
   border: var(--border, 1px solid rgba(255,255,255,0.14));
-  background: rgba(255,255,255,0.05);
+  background: rgba(0,0,0,0.05);
   color: var(--text, #e5e7eb);
   font-weight: 700;
   letter-spacing: 0.2px;

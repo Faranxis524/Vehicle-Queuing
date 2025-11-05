@@ -21,7 +21,7 @@
 }
 
 .history-table th {
-  background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.04));
+  background: linear-gradient(180deg, rgba(0,0,0,0.08), rgba(0,0,0,0.04));
   color: #fff;
   font-weight: 700;
   text-transform: uppercase;
@@ -33,7 +33,7 @@
 }
 
 .history-table tr:hover {
-  background: rgba(255,255,255,0.06);
+  background: rgba(0,0,0,0.06);
 }
 /* Enhancements for contrast, readability, and a professional dark theme fit */
 
@@ -177,7 +177,7 @@
   transform: translateY(-2px);
   box-shadow: 0 8px 25px rgba(0,0,0,0.15);
   border-color: rgba(255,255,255,0.2);
-  background: var(--card-bg-hover, rgba(255,255,255,0.05));
+  background: var(--card-bg-hover, rgba(0,0,0,0.05));
 }
 
 .po-header {
@@ -269,7 +269,7 @@
   padding: 8px 12px;
   border: 1px solid var(--border-color, rgba(255,255,255,0.2));
   border-radius: 6px;
-  background: var(--card-bg, rgba(255,255,255,0.05));
+  background: var(--card-bg, rgba(0,0,0,0.05));
   color: var(--text);
   font-size: 14px;
   cursor: pointer;
@@ -285,10 +285,15 @@
 
 .company-filter-dropdown:hover {
   border-color: rgba(255,255,255,0.3);
-  background: var(--card-bg-hover, rgba(255,255,255,0.08));
+  background: var(--card-bg-hover, rgba(0,0,0,0.08));
 }
 
 .company-filter-dropdown option {
-  background: var(--card-bg, rgba(0,0,0,0.9));
-  color: var(--text);
+  background: white;
+  color: #0f172a;
+}
+
+[data-theme='dark'] .company-filter-dropdown option {
+  background: black;
+  color: #e5e7eb;
 }

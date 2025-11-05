@@ -21,6 +21,7 @@
 
 /* .po-card deprecated; now using .card from App.css */
 
+/* Legacy modal styles - consider migrating to Dialog component */
 .modal {
   position: fixed;
   top: 0;
@@ -165,11 +166,22 @@
   padding: 10px 12px;
   border-radius: 10px;
   border: 1px solid rgba(255,255,255,0.14);
-  background: rgba(255,255,255,0.06);
+  background: rgba(0,0,0,0.06);
   color: var(--text);
   outline: none;
+  appearance: none;
   transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
   font-size: 14px;
+}
+
+.po-form select option {
+  background: white;
+  color: #0f172a;
+}
+
+[data-theme='dark'] .po-form select option {
+  background: black;
+  color: #e5e7eb;
 }
 
 .po-form input::placeholder {
@@ -180,7 +192,7 @@
 .po-form select:focus {
   border-color: rgba(255,255,255,0.22);
   box-shadow: 0 0 0 3px rgba(185,28,28,0.25); /* professional red focus */
-  background: rgba(255,255,255,0.08);
+  background: rgba(0,0,0,0.08);
 }
 
 /* Light theme input styles */
@@ -223,7 +235,7 @@
   font-weight: 600;
   letter-spacing: 0.2px;
   color: var(--text);
-  background: rgba(255,255,255,0.05);
+  background: rgba(0,0,0,0.05);
   cursor: pointer;
   transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease, border-color 150ms ease;
 }
@@ -283,9 +295,9 @@
   color: var(--text);
 }
 
-/* Make select caret visible on light background (WebKit) */
+/* Make select caret visible on dark background (WebKit) */
 .po-form select::-ms-expand { display: none; }
-.po-form input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(20%); }
+.po-form input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(80%); }
 
 /* Kiosk-style modal styles */
 .kiosk-modal {
@@ -308,7 +320,7 @@
 
 .kiosk-header h2 {
   margin: 0;
-  color: #111827;
+  color: var(--text);
   font-size: 24px;
 }
 
@@ -329,8 +341,8 @@
 }
 
 .close-btn:hover {
-  background-color: #f3f4f6;
-  color: #374151;
+  background-color: rgba(255,255,255,0.1);
+  color: var(--text);
 }
 
 .kiosk-form {
@@ -342,15 +354,15 @@
 }
 
 .kiosk-section {
-  background: #f9fafb;
+  background: var(--panel);
   border-radius: 12px;
   padding: 20px;
-  border: 1px solid #e5e7eb;
+  border: var(--border);
 }
 
 .kiosk-section h3 {
   margin: 0 0 20px 0;
-  color: #111827;
+  color: var(--text);
   font-size: 18px;
   font-weight: 600;
 }
@@ -369,30 +381,43 @@
 .input-group label {
   font-size: 14px;
   font-weight: 600;
-  color: #374151;
+  color: var(--text);
   margin-bottom: 6px;
 }
 
 .input-group input,
 .input-group select {
   padding: 12px;
-  border: 1px solid #d1d5db;
+  border: 1px solid rgba(255,255,255,0.14);
   border-radius: 8px;
   font-size: 14px;
+  background: rgba(0,0,0,0.06);
+  color: var(--text);
+  appearance: none;
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+}
+
+.input-group select option {
   background: white;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  color: #0f172a;
+}
+
+[data-theme='dark'] .input-group select option {
+  background: black;
+  color: #e5e7eb;
 }
 
 .input-group input:focus,
 .input-group select:focus {
   outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  border-color: rgba(255,255,255,0.22);
+  box-shadow: 0 0 0 3px rgba(185,28,28,0.25);
+  background: rgba(0,0,0,0.08);
 }
 
 .input-group input.error {
-  border-color: #dc2626;
-  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+  border-color: var(--danger);
+  box-shadow: 0 0 0 3px rgba(127, 29, 29, 0.25);
 }
 
 .error-message {
@@ -410,8 +435,8 @@
 }
 
 .product-card {
-  background: white;
-  border: 1px solid #e5e7eb;
+  background: var(--card-bg);
+  border: var(--border);
   border-radius: 12px;
   padding: 20px;
   display: column;
@@ -420,13 +445,13 @@
 }
 
 .product-card:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  border-color: #3b82f6;
+  box-shadow: var(--shadow);
+  border-color: rgba(255,255,255,0.14);
 }
 
 .product-info h4 {
   margin: 0 0 8px 0;
-  color: #111827;
+  color: var(--text);
   font-size: 16px;
   font-weight: 600;
 }
@@ -440,7 +465,7 @@
 
 .product-size {
   margin: 0;
-  color: #6b7280;
+  color: var(--muted);
   font-size: 12px;
 }
 
@@ -463,7 +488,7 @@
   padding: 8px 12px;
   border: 2px solid transparent;
   border-radius: 6px;
-  background: rgba(255,255,255,0.05);
+  background: rgba(0,0,0,0.05);
   color: var(--text);
   font-size: 13px;
   font-weight: 500;
@@ -473,7 +498,7 @@
 }
 
 .pricing-btn:hover {
-  background: rgba(255,255,255,0.08);
+  background: rgba(0,0,0,0.08);
   outline-color: rgba(59, 130, 246, 0.5);
 }
 
@@ -510,7 +535,7 @@
   font-size: 12px;
   border-radius: 4px;
   border: 1px solid rgba(255,255,255,0.2);
-  background: rgba(255,255,255,0.05);
+  background: rgba(0,0,0,0.05);
   color: var(--text);
 }
 
@@ -523,8 +548,8 @@
 .qty-btn {
   width: 40px;
   height: 40px;
-  border: 1px solid #d1d5db;
-  background: white;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(0,0,0,0.06);
   border-radius: 8px;
   font-size: 18px;
   font-weight: 600;
@@ -533,11 +558,12 @@
   align-items: center;
   justify-content: center;
   transition: all 0.2s;
+  color: var(--text);
 }
 
 .qty-btn:hover {
-  background: #f3f4f6;
-  border-color: #9ca3af;
+  background: rgba(0,0,0,0.1);
+  border-color: rgba(255,255,255,0.2);
 }
 
 .qty-btn.minus {
@@ -553,26 +579,27 @@
   text-align: center;
   font-size: 16px;
   font-weight: 600;
-  color: #111827;
+  color: var(--text);
 }
 
 .quantity-input {
   width: 60px;
   height: 40px;
-  border: 1px solid #d1d5db;
+  border: 1px solid rgba(255,255,255,0.14);
   border-radius: 6px;
   text-align: center;
   font-size: 16px;
   font-weight: 600;
-  color: #111827;
-  background: white;
+  color: var(--text);
+  background: rgba(0,0,0,0.06);
   margin: 0 5px;
 }
 
 .quantity-input:focus {
   outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+  border-color: rgba(255,255,255,0.22);
+  box-shadow: 0 0 0 3px rgba(185,28,28,0.25);
+  background: rgba(0,0,0,0.08);
 }
 
 .quantity-input::-webkit-outer-spin-button,
@@ -595,7 +622,7 @@
 
 .order-summary h3 {
   margin: 0 0 20px 0;
-  color: #111827;
+  color: var(--text);
   font-size: 18px;
   font-weight: 600;
 }
@@ -649,39 +676,45 @@
 
 .cancel-btn {
   padding: 12px 24px;
-  background: #6b7280;
+  background: linear-gradient(180deg, var(--secondary), var(--secondary-dark));
+  border: 1px solid rgba(255,255,255,0.18);
   color: white;
-  border: none;
   border-radius: 8px;
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease, border-color 150ms ease;
 }
 
 .cancel-btn:hover {
-  background: #4b5563;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+  border-color: rgba(255,255,255,0.14);
 }
 
 .submit-btn {
   padding: 12px 24px;
-  background: #059669;
+  background: linear-gradient(180deg, var(--success), #059669);
+  border: 1px solid rgba(255,255,255,0.18);
   color: white;
-  border: none;
   border-radius: 8px;
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease, border-color 150ms ease;
 }
 
 .submit-btn:hover:not(:disabled) {
-  background: #047857;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+  border-color: rgba(255,255,255,0.14);
 }
 
 .submit-btn:disabled {
   background: #9ca3af;
   cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 /* PO Detail Modal Styles */
@@ -824,34 +857,48 @@
 }
 
 .action-buttons button:first-child {
-  background: #ffffff;
-  color: rgb(0, 0, 0);
+  background: linear-gradient(180deg, var(--secondary), var(--secondary-dark));
+  border: 1px solid rgba(255,255,255,0.18);
+  color: white;
+  transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease, border-color 150ms ease;
+}
+
+.action-buttons button:first-child:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+  border-color: rgba(255,255,255,0.14);
 }
 
 .delete-btn {
-  background: #dc2626 !important;
+  background: linear-gradient(180deg, var(--danger), #7F1D1D) !important;
+  border: 1px solid rgba(255,255,255,0.18) !important;
   color: white;
+  transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease, border-color 150ms ease !important;
 }
 
 .delete-btn:hover {
-  background: #b91c1c !important;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+  border-color: rgba(255,255,255,0.14) !important;
 }
 
 .confirm-btn {
-  background: #059669 !important;
+  background: linear-gradient(180deg, var(--success), #059669) !important;
+  border: 1px solid rgba(255,255,255,0.18) !important;
   color: white;
-  border: none;
   padding: 8px 16px;
   border-radius: 6px;
   cursor: pointer;
   font-size: 14px;
   font-weight: 500;
-  transition: background-color 0.2s;
+  transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease, border-color 150ms ease;
   margin-right: 10px;
 }
 
 .confirm-btn:hover {
-  background: #047857 !important;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+  border-color: rgba(255,255,255,0.14) !important;
 }
 
 .badge.delivered .dot {
@@ -867,16 +914,16 @@
   justify-content: space-between;
   align-items: center;
   padding: 15px;
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
+  background: var(--card-bg);
+  border: var(--border);
   border-radius: 8px;
   margin-bottom: 10px;
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .vehicle-option:hover {
-  border-color: #3b82f6;
-  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.1);
+  border-color: rgba(255,255,255,0.14);
+  box-shadow: var(--shadow);
 }
 
 .vehicle-info {
@@ -885,7 +932,7 @@
 
 .vehicle-info strong {
   display: block;
-  color: #111827;
+  color: var(--text);
   font-size: 16px;
   margin-bottom: 5px;
 }
@@ -895,7 +942,7 @@
   gap: 15px;
   flex-wrap: wrap;
   font-size: 14px;
-  color: #6b7280;
+  color: var(--muted);
 }
 
 .vehicle-details span {
@@ -914,19 +961,21 @@
 }
 
 .vehicle-option button {
-  background: #059669;
+  background: linear-gradient(180deg, var(--success), #059669);
+  border: 1px solid rgba(255,255,255,0.18);
   color: white;
-  border: none;
   padding: 8px 16px;
   border-radius: 6px;
   cursor: pointer;
   font-size: 14px;
   font-weight: 500;
-  transition: background-color 0.2s;
+  transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease, border-color 150ms ease;
 }
 
 .vehicle-option button:hover {
-  background: #047857;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+  border-color: rgba(255,255,255,0.14);
 }
 
 .load-bar {
@@ -1027,34 +1076,38 @@
 
 .save-btn {
   padding: 12px 24px;
-  background: #059669;
+  background: linear-gradient(180deg, var(--success), #059669);
+  border: 1px solid rgba(255,255,255,0.18);
   color: white;
-  border: none;
   border-radius: 8px;
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease, border-color 150ms ease;
 }
 
 .save-btn:hover {
-  background: #047857;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+  border-color: rgba(255,255,255,0.14);
 }
 
 .cancel-edit-btn {
   padding: 12px 24px;
-  background: #6b7280;
+  background: linear-gradient(180deg, var(--secondary), var(--secondary-dark));
+  border: 1px solid rgba(255,255,255,0.18);
   color: white;
-  border: none;
   border-radius: 8px;
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease, border-color 150ms ease;
 }
 
 .cancel-edit-btn:hover {
-  background: #4b5563;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+  border-color: rgba(255,255,255,0.14);
 }
 
 /* Vehicle display on PO cards */
