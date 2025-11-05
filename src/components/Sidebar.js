@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import logo from '../companyLogo.png';
 import './Sidebar.css';
 
 const Sidebar = () => {
@@ -29,7 +30,16 @@ const Sidebar = () => {
   return (
     <div className="sidebar">
       <div>
-        <h2>Admin Dashboard</h2>
+        <div className="sidebar-header">
+          <div className="sidebar-logo-section">
+            <img src={logo} alt="HILTAC Logo" className="sidebar-logo" />
+            <div className="sidebar-text">
+              <h1 className="sidebar-title">HILTAC</h1>
+              <p className="sidebar-subtitle">Manufacturing and Trading Inc.</p>
+            </div>
+          </div>
+          <h2 className="sidebar-dashboard-title">Admin Dashboard</h2>
+        </div>
         <ul>
           <li><Link to="/po-monitoring" className={location.pathname === '/po-monitoring' ? 'active' : ''}>PO Monitoring</Link></li>
           <li><Link to="/vehicle-monitoring" className={location.pathname === '/vehicle-monitoring' ? 'active' : ''}>Vehicle Monitoring</Link></li>

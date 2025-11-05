@@ -116,7 +116,6 @@ const DriverInfo = () => {
           );
         })}
       </div>
-      <p className="card-meta" style={{ marginTop: 12 }}>For drivers to log in and update, they can access /login</p>
     </div>
   );
 };
