@@ -13,7 +13,7 @@ const products = {
     }
   },
   'Jumbo Roll': {
-    size: 66816,
+    size: 39016.5, // Updated to match 12-roll case volume
     packaging: [
       { type: 'case', quantity: 12, name: 'Case (12 rolls)' },
       { type: 'case', quantity: 16, name: 'Case (16 rolls)' }

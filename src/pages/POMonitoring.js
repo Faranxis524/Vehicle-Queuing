@@ -6,7 +6,7 @@ import './POMonitoring.css';
 
 const products = {
   'Interfolded': {
-    size: 0, // Individual piece dimension = 0
+    size: 2000, // cm³ per piece (Interfolded Paper Towel piece/roll volume)
     packaging: { type: 'case', quantity: 30, name: 'Case (30 pcs)', size: 70780.5 },
     pricing: {
       perPiece: { price: 26, unit: 'piece' },
@@ -14,10 +14,10 @@ const products = {
     }
   },
   'Jumbo Roll': {
-    size: 0, // Individual roll dimension = 0
+    size: 3648.4, // cm³ per roll (Jumbo Roll Tissue piece/roll volume)
     packaging: [
-      { type: 'case', quantity: 12, name: 'Case (12 rolls)', size: 66816 },
-      { type: 'case', quantity: 16, name: 'Case (16 rolls)', size: 66816 }
+      { type: 'case', quantity: 12, name: 'Case (12 rolls)', size: 39016.5 },
+      { type: 'case', quantity: 16, name: 'Case (16 rolls)', size: 90956.25 }
     ],
     pricing: {
       perPiece: { price: 51, unit: 'roll' },
@@ -28,7 +28,7 @@ const products = {
     }
   },
   'Bathroom': {
-    size: 0, // Individual roll dimension = 0
+    size: 926.7, // cm³ per roll (Bathroom Tissue piece/roll volume)
     packaging: { type: 'case', quantity: 48, name: 'Case (48 rolls)', size: 45630 },
     pricing: {
       perPiece: { price: 8.15, unit: 'roll' },
@@ -36,7 +36,7 @@ const products = {
     }
   },
   'Hand Roll': {
-    size: 0, // Individual roll dimension = 0
+    size: 6813.6, // cm³ per roll (Hand Roll Tissue piece/roll volume)
     packaging: { type: 'case', quantity: 6, name: 'Case (6 rolls)', size: 46200 },
     pricing: {
       perPiece: { price: 134, unit: 'roll' },
@@ -390,8 +390,8 @@ const POMonitoring = () => {
           itemSize = packaging.size;
         }
       } else if (item.pricingType === 'perPiece') {
-        // Individual pieces have 0 dimension
-        itemSize = product.size; // This is 0
+        // Use individual piece volume
+        itemSize = product.size;
       }
 
       return total + (item.quantity * itemSize);
@@ -1319,8 +1319,8 @@ const POMonitoring = () => {
                        <h4>{productName}</h4>
                        <p className="product-size">
                          {Array.isArray(productInfo.packaging)
-                           ? `Case sizes: ${productInfo.packaging.map(p => `${p.name} (${p.size.toLocaleString()} cm²)`).join(', ')}`
-                           : `${productInfo.packaging.name} (${productInfo.packaging.size.toLocaleString()} cm²)`
+                         ? `Case sizes: ${productInfo.packaging.map(p => `${p.name} (${p.size.toLocaleString()} cm³)`).join(', ')}`
+                         : `${productInfo.packaging.name} (${productInfo.packaging.size.toLocaleString()} cm³)`
                          }
                        </p>
                        <div className="pricing-buttons">
@@ -1648,7 +1648,7 @@ const POMonitoring = () => {
                 </div>
               </div>
               <div className="card-meta">Delivery: {po.deliveryDate}</div>
-              <div className="card-meta">Load: {load.toLocaleString()} cm²</div>
+              <div className="card-meta">Load: {load.toLocaleString()} cm³</div>
               {assigned && vehicle && (
                 <div className="load-indicator">
                   <span className="vehicle-assigned">{po.assignedTruck}</span>

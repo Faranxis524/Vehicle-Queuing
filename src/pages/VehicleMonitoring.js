@@ -114,7 +114,7 @@ const VehicleMonitoring = () => {
               key={vehicle.id}
               className="card"
               onClick={() => { setSelectedVehicle(vehicle); setShowModal(true); }}
-              title={`${vehicle.name} • Remaining: ${remaining.toLocaleString()} cm²`}
+              title={`${vehicle.name} • Remaining: ${remaining.toLocaleString()} cm³`}
             >
               <div className="card-header">
                 <div>
@@ -132,7 +132,7 @@ const VehicleMonitoring = () => {
                 <span style={{ width: `${pct}%` }} />
               </div>
               <div className="card-footer">
-                <span className="card-meta">{pct.toFixed(1)}% used • Remaining {remaining.toLocaleString()} cm²</span>
+                <span className="card-meta">{pct.toFixed(1)}% used • Remaining {remaining.toLocaleString()} cm³</span>
               </div>
             </div>
           );
@@ -156,7 +156,7 @@ const VehicleMonitoring = () => {
                       <p>{po.customerName}</p>
                       <p>{po.location}</p>
                       <p>{po.deliveryDate}</p>
-                      <p><strong>Load: {po.load ? po.load.toLocaleString() : '0'} cm²</strong></p>
+                      <p><strong>Load: {po.load ? po.load.toLocaleString() : '0'} cm³</strong></p>
                     </div>
                   </div>
                 ))}

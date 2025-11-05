@@ -15,7 +15,7 @@ const products = {
     }
   },
   'Jumbo Roll': {
-    size: 66816,
+    size: 39016.5, // Updated to match 12-roll case volume
     packaging: [
       { type: 'case', quantity: 12, name: 'Case (12 rolls)' },
       { type: 'case', quantity: 16, name: 'Case (16 rolls)' }
@@ -434,7 +434,7 @@ const DriverDashboard = () => {
                       <p>{po.customerName}</p>
                       <p>{po.location}</p>
                       <p>{po.deliveryDate}</p>
-                      <p><strong>Load: {po.load ? po.load.toLocaleString() : '0'} cm²</strong></p>
+                      <p><strong>Load: {po.load ? po.load.toLocaleString() : '0'} cm³</strong></p>
                     </div>
                     <div className="po-actions">
                       {po.deliveryStatus !== 'done' && (

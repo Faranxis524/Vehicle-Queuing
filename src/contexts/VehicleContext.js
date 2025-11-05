@@ -91,19 +91,26 @@ const calculateLoad = (po) => {
   const products = {
     'Interfolded': {
       packaging: { size: 70780.5 },
-      dimensions: { length: 300, width: 200, height: 150 } // mm per case
+      dimensions: { length: 535, width: 315, height: 420 }, // mm per case (53.5 x 31.5 x 42 cm)
+      pieceSize: 2000 // cm³ per piece (Interfolded Paper Towel piece/roll volume)
     },
     'Jumbo Roll': {
-      packaging: [{ size: 66816, dimensions: { length: 400, width: 300, height: 200 } }, { size: 66816, dimensions: { length: 400, width: 300, height: 200 } }],
-      dimensions: { length: 400, width: 300, height: 200 } // mm per roll
+      packaging: [
+        { size: 39016.5, dimensions: { length: 370, width: 285, height: 370 } }, // 12 rolls case (37 × 28.5 × 37 cm)
+        { size: 90956.25, dimensions: { length: 495, width: 375, height: 490 } }  // 16 rolls case (49.5 × 37.5 × 49 cm)
+      ],
+      dimensions: { length: 400, width: 300, height: 200 }, // mm per roll (estimated)
+      pieceSize: 3648.4 // cm³ per roll (Jumbo Roll Tissue piece/roll volume)
     },
     'Bathroom': {
-      packaging: { size: 45630, dimensions: { length: 250, width: 180, height: 120 } },
-      dimensions: { length: 250, width: 180, height: 120 } // mm per bundle
+      packaging: { size: 45630, dimensions: { length: 585, width: 390, height: 200 } }, // mm per case (58.5 x 39 x 20 cm)
+      dimensions: { length: 250, width: 180, height: 120 }, // mm per bundle (estimated)
+      pieceSize: 926.7 // cm³ per roll (Bathroom Tissue piece/roll volume)
     },
     'Hand Roll': {
-      packaging: { size: 46200, dimensions: { length: 200, width: 150, height: 100 } },
-      dimensions: { length: 200, width: 150, height: 100 } // mm per bundle
+      packaging: { size: 46200, dimensions: { length: 550, width: 400, height: 210 } }, // mm per case (55 x 40 x 21 cm)
+      dimensions: { length: 200, width: 150, height: 100 }, // mm per bundle (estimated)
+      pieceSize: 6813.6 // cm³ per roll (Hand Roll Tissue piece/roll volume)
     }
   };
 
@@ -119,6 +126,8 @@ const calculateLoad = (po) => {
       } else {
         itemSize = product.packaging.size;
       }
+    } else if (item.pricingType === 'perPiece') {
+      itemSize = product.pieceSize || 0;
     }
     return total + (item.quantity * itemSize);
   }, 0);
@@ -129,19 +138,22 @@ const checkDimensionsFit = (po, vehicle) => {
   const products = {
     'Interfolded': {
       packaging: { size: 70780.5 },
-      dimensions: { length: 300, width: 200, height: 150 } // mm per case
+      dimensions: { length: 535, width: 315, height: 420 } // mm per case (53.5 x 31.5 x 42 cm)
     },
     'Jumbo Roll': {
-      packaging: [{ size: 66816, dimensions: { length: 400, width: 300, height: 200 } }, { size: 66816, dimensions: { length: 400, width: 300, height: 200 } }],
-      dimensions: { length: 400, width: 300, height: 200 } // mm per roll
+      packaging: [
+        { size: 39016.5, dimensions: { length: 370, width: 285, height: 370 } }, // 12 rolls case (37 × 28.5 × 37 cm)
+        { size: 90956.25, dimensions: { length: 495, width: 375, height: 490 } }  // 16 rolls case (49.5 × 37.5 × 49 cm)
+      ],
+      dimensions: { length: 400, width: 300, height: 200 } // mm per roll (estimated)
     },
     'Bathroom': {
-      packaging: { size: 45630, dimensions: { length: 250, width: 180, height: 120 } },
-      dimensions: { length: 250, width: 180, height: 120 } // mm per bundle
+      packaging: { size: 45630, dimensions: { length: 585, width: 390, height: 200 } }, // mm per case (58.5 x 39 x 20 cm)
+      dimensions: { length: 250, width: 180, height: 120 } // mm per bundle (estimated)
     },
     'Hand Roll': {
-      packaging: { size: 46200, dimensions: { length: 200, width: 150, height: 100 } },
-      dimensions: { length: 200, width: 150, height: 100 } // mm per bundle
+      packaging: { size: 46200, dimensions: { length: 550, width: 400, height: 210 } }, // mm per case (55 x 40 x 21 cm)
+      dimensions: { length: 200, width: 150, height: 100 } // mm per bundle (estimated)
     }
   };
 
