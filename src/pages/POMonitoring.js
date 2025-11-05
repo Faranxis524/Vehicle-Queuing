@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { collection, addDoc, onSnapshot, doc, deleteDoc, query, orderBy, updateDoc } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, doc, deleteDoc, query, orderBy, updateDoc, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useVehicles } from '../contexts/VehicleContext';
 import './POMonitoring.css';
@@ -46,13 +46,13 @@ const products = {
 };
 
 const customers = {
-  'Sisko': ['Pampanga', 'Bulacan', 'BGC Taguig', 'Quezon City', 'Makati', 'Alabang', 'Calamba', 'Lipa'],
-  'Sudexo': ['Bulacan', 'BGC Taguig', 'Quezon City', 'Makati', 'Alabang', 'Calamba', 'Lipa'],
-  'John\'s Lang': ['BGC Taguig', 'Quezon City', 'Makati', 'Alabang', 'Calamba', 'Lipa'],
+  'Xisco': ['Pampanga', 'Bulacan', 'BGC Taguig', 'Quezon City', 'Makati', 'Alabang', 'Calamba', 'Lipa'],
+  'Sodexo': ['Bulacan', 'BGC Taguig', 'Quezon City', 'Makati', 'Alabang', 'Calamba', 'Lipa'],
+  'Jones Lang LaSalle': ['BGC Taguig', 'Quezon City', 'Makati', 'Alabang', 'Calamba', 'Lipa'],
   'WeWork': ['Uptown', 'RCBC', 'Menarco', 'Milestone'],
   'China Bank': ['Makati', 'Binondo', 'Mega Town'],
-  'Tata Consultant Service Philippine Inc.': ['Bench Taguig', 'Entech Pampanga', 'Panorama BGC Taguig'],
-  'VXI Global Philippines': ['Entech Pampanga', 'Bridgetown Quezon City', 'Makati', 'MOA', 'Panorama BGC Taguig']
+  'Tata Consultancy Services Philippines Inc.': ['Bench Taguig', 'Entech Pampanga', 'Panorama BGC Taguig'],
+  'VXI Global Holdings  B. V. Philippines': ['Entech Pampanga', 'Bridgetown Quezon City', 'Makati', 'MOA', 'Panorama BGC Taguig']
 };
 
 const clusters = {
@@ -677,9 +677,26 @@ const POMonitoring = () => {
         details: `PO ${selectedPO.customId} was updated`
       });
 
+      // Auto-rebalance loads after PO update - get fresh data from Firestore
+      try {
+        // Fetch all POs from Firestore to ensure we have the latest data
+        const posQuery = query(collection(db, 'pos'), orderBy('createdAt'));
+        const querySnapshot = await getDocs(posQuery);
+        const allPOs = [];
+        querySnapshot.forEach((doc) => {
+          allPOs.push({ id: doc.id, customId: doc.data().customId, ...doc.data() });
+        });
+
+        const rebalanceResult = await rebalanceLoads(allPOs);
+        console.log('Auto-rebalance after PO update:', rebalanceResult);
+      } catch (rebalanceError) {
+        console.error('Auto-rebalance failed after PO update:', rebalanceError);
+        // Don't fail the PO update if rebalancing fails
+      }
+
       setIsEditing(false);
       setShowModal(false);
-      alert('PO updated successfully!');
+      alert('PO updated successfully! Load rebalancing has been performed.');
     } catch (error) {
       console.error('Error updating PO:', error);
       alert('Failed to update PO. Please try again.');

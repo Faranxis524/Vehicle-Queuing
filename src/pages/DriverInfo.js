@@ -7,7 +7,7 @@ import './DriverInfo.css';
 // Extended driver information with contact details and helpers
 const driverDetails = {
   'Randy Maduro': {
-    vehicle: 'Isuzu Truck',
+    vehicle: '6 Wheeler Truck',
     contactNumber: '09154080447',
     helpers: [
       { name: 'Marvin Soriano', contactNumber: '09169334034' },
@@ -22,14 +22,14 @@ const driverDetails = {
     ]
   },
   'Fernando Besa': {
-    vehicle: 'Isuzu Flexy Small',
+    vehicle: 'Isuzu Flexi Small',
     contactNumber: '09551453174',
     helpers: [
       { name: 'Noel Bulahog', contactNumber: '09702937219' }
     ]
   },
   'Joseph Allan Saldivar': {
-    vehicle: 'Isuzu Flexy Big',
+    vehicle: 'Isuzu Flexi Big',
     contactNumber: '09751432072',
     helpers: [
       { name: 'Ronilo Ligao', contactNumber: '09932977963' }

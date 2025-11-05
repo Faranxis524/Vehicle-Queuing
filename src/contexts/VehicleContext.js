@@ -9,49 +9,49 @@ export const useVehicles = () => useContext(VehicleContext);
 const initialVehicles = [
   {
     id: 'isuzu-flexy-small',
-    name: 'Isuzu Flexy Small',
+    name: 'Isuzu Flexi Small',
     capacity: 9929700,
     dimensions: { length: 4000, width: 1800, height: 2000 }, // mm
     currentLoad: 0,
     ready: true,
     driver: 'Fernando Besa',
-    plateNumber: 'ABC-123',
+    plateNumber: 'NDM9924',
     status: 'Available',
     assignedPOs: []
   },
   {
     id: 'isuzu-flexy-big',
-    name: 'Isuzu Flexy Big',
+    name: 'Isuzu Flexi Big',
     capacity: 10230600,
     dimensions: { length: 4500, width: 2000, height: 2200 }, // mm
     currentLoad: 0,
     ready: true,
     driver: 'Joseph Allan Saldivar',
-    plateNumber: 'DEF-456',
+    plateNumber: 'NIS9978',
     status: 'Available',
     assignedPOs: []
   },
   {
     id: 'isuzu-truck',
-    name: 'Isuzu Truck',
+    name: '6 Wheeler Truck',
     capacity: 21470000,
     dimensions: { length: 6000, width: 2400, height: 2800 }, // mm
     currentLoad: 0,
     ready: true,
     driver: 'Randy Maduro',
-    plateNumber: 'GHI-789',
+    plateNumber: 'NAM4827',
     status: 'Available',
     assignedPOs: []
   },
   {
     id: 'h100',
-    name: 'H100',
+    name: 'Hyundai H100',
     capacity: 7149791.25,
     dimensions: { length: 3500, width: 1600, height: 1800 }, // mm
     currentLoad: 0,
     ready: true,
     driver: 'Adrian Silao',
-    plateNumber: 'JKL-012',
+    plateNumber: 'DAJ9076',
     status: 'Available',
     assignedPOs: []
   }

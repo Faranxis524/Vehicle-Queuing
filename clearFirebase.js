@@ -24,10 +24,10 @@ const clearCollection = async (collectionName) => {
 
 const initializeDrivers = async () => {
   const drivers = [
-    { name: 'Fernando Besa', vehicle: 'Isuzu Flexy Small', confirmed: true, status: 'Available' },
-    { name: 'Joseph Allan Saldivar', vehicle: 'Isuzu Flexy Big', confirmed: true, status: 'Available' },
-    { name: 'Randy Maduro', vehicle: 'Isuzu Truck', confirmed: true, status: 'Available' },
-    { name: 'Adrian Silao', vehicle: 'H100', confirmed: true, status: 'Available' }
+    { name: 'Fernando Besa', vehicle: 'Isuzu Flexi Small', confirmed: true, status: 'Available' },
+    { name: 'Joseph Allan Saldivar', vehicle: 'Isuzu Flexi Big', confirmed: true, status: 'Available' },
+    { name: 'Randy Maduro', vehicle: '6 Wheeler Truck', confirmed: true, status: 'Available' },
+    { name: 'Adrian Silao', vehicle: 'Hyundai H100', confirmed: true, status: 'Available' }
   ];
 
   for (const driver of drivers) {
