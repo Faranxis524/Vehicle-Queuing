@@ -1,4 +1,4 @@
-.sidebar {
+ .sidebar {
   width: 250px;
   height: 100vh;
   background: linear-gradient(180deg, var(--panel), rgba(185,28,28,0.1)); /* subtle red gradient */
@@ -123,7 +123,7 @@
 /* Logout button below */
 .logout-btn {
   width: calc(100% - 4px);
-  margin: 8px 2px 0 2px;
+  margin: 0 2px;
   padding: 10px 12px;
   border-radius: 10px;
   border: 1px solid rgba(255,255,255,0.14);
