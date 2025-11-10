@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { collection, addDoc, onSnapshot, doc, deleteDoc, query, orderBy, updateDoc, getDocs } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, doc, deleteDoc, query, orderBy, updateDoc, getDocs, where } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useVehicles } from '../contexts/VehicleContext';
 import NotificationDialog from '../components/NotificationDialog';
@@ -672,6 +672,22 @@ const POMonitoring = () => {
       return;
     }
 
+    // Check for duplicate PO number (excluding current PO)
+    if (editForm.poNumber.trim()) {
+      const poQuery = query(collection(db, 'pos'), where('customId', '==', editForm.poNumber.trim()));
+      const poSnapshot = await getDocs(poQuery);
+      const existingPOs = poSnapshot.docs.filter(doc => doc.id !== selectedPO.id);
+      if (existingPOs.length > 0) {
+        setNotification({
+          type: 'error',
+          title: 'Duplicate PO Number',
+          message: `PO number "${editForm.poNumber}" already exists. Please enter a unique PO number.`,
+          showCloseButton: true
+        });
+        return;
+      }
+    }
+
     try {
       const updatedPO = {
         customId: editForm.poNumber,
@@ -717,18 +733,6 @@ const POMonitoring = () => {
         autoCloseDelay: 3000,
         showCloseButton: false
       });
-
-      // Show notification for new PO creation
-      setTimeout(() => {
-        setNotification({
-          type: 'info',
-          title: 'New Purchase Order Created',
-          message: `PO ${selectedPO.customId} has been successfully created and is ready for processing.`,
-          autoClose: true,
-          autoCloseDelay: 4000,
-          showCloseButton: false
-        });
-      }, 3500);
     } catch (error) {
       console.error('Error updating PO:', error);
       setNotification({
@@ -741,6 +745,21 @@ const POMonitoring = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // Check for duplicate PO number
+    if (form.poNumber.trim()) {
+      const poQuery = query(collection(db, 'pos'), where('customId', '==', form.poNumber.trim()));
+      const poSnapshot = await getDocs(poQuery);
+      if (!poSnapshot.empty) {
+        setNotification({
+          type: 'error',
+          title: 'Duplicate PO Number',
+          message: `PO number "${form.poNumber}" already exists. Please enter a unique PO number.`,
+          showCloseButton: true
+        });
+        return;
+      }
+    }
 
     // Validate phone number if provided
     if (form.phone.trim()) {

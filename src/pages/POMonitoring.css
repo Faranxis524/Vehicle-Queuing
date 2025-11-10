@@ -1128,6 +1128,45 @@
   border-color: rgba(255,255,255,0.14);
 }
 
+/* Edit form dark mode styles */
+.edit-form input,
+.edit-form select {
+  background: rgba(0,0,0,0.06);
+  color: var(--text);
+  border: 1px solid rgba(255,255,255,0.14);
+}
+
+.edit-form input:focus,
+.edit-form select:focus {
+  border-color: rgba(255,255,255,0.22);
+  box-shadow: 0 0 0 3px rgba(185,28,28,0.25);
+  background: rgba(0,0,0,0.08);
+}
+
+.edit-form select option {
+  background: white;
+  color: #0f172a;
+}
+
+[data-theme='dark'] .edit-form input,
+[data-theme='dark'] .edit-form select {
+  background: rgba(0,0,0,0.06);
+  color: var(--text);
+  border-color: rgba(255,255,255,0.14);
+}
+
+[data-theme='dark'] .edit-form input:focus,
+[data-theme='dark'] .edit-form select:focus {
+  border-color: rgba(255,255,255,0.22);
+  box-shadow: 0 0 0 3px rgba(185,28,28,0.25);
+  background: rgba(0,0,0,0.08);
+}
+
+[data-theme='dark'] .edit-form select option {
+  background: black;
+  color: #e5e7eb;
+}
+
 /* Vehicle display on PO cards */
 .card-vehicle {
   margin-top: 8px;
