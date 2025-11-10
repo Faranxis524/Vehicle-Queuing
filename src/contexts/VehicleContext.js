@@ -382,7 +382,25 @@ export const VehicleProvider = ({ children }) => {
   // Comprehensive rebalance function implementing all 10 rebalancing rules
   const rebalanceLoads = async (allPOs) => {
     console.log('Starting comprehensive rebalance with all 10 rules...');
-    
+
+    // Get all existing delivery dates from assigned POs
+    const existingDeliveryDates = new Set();
+    vehicles.forEach(vehicle => {
+      if (vehicle.assignedPOs && vehicle.assignedPOs.length > 0) {
+        vehicle.assignedPOs.forEach(poId => {
+          const assignedPO = allPOs.find(p => p.id === poId);
+          if (assignedPO && assignedPO.deliveryDate) {
+            existingDeliveryDates.add(assignedPO.deliveryDate);
+          }
+        });
+      }
+    });
+
+    // Convert to array and sort to find earliest date
+    const sortedExistingDates = Array.from(existingDeliveryDates).sort();
+    const earliestExistingDate = sortedExistingDates.length > 0 ? sortedExistingDates[0] : null;
+    const currentDate = new Date().toISOString().split('T')[0];
+
     // Rule 9: Full Recalculation - Clear all current assignments (ignore previous assignments)
     const resetVehicles = vehicles.map(v => ({
       ...v,
@@ -391,12 +409,30 @@ export const VehicleProvider = ({ children }) => {
       // Track which clusters are assigned to this vehicle per delivery date
       dateClusterMap: {}
     }));
-    
+
     // Create a working copy of vehicles for assignment tracking
     let workingVehicles = [...resetVehicles];
-    
+
     // Filter out completed, in-transit, and delivered POs - only rebalance pending, assigned, on-hold, and unassignable POs
-    const activePOs = allPOs.filter(po => po.status !== 'completed' && po.status !== 'in-transit' && po.status !== 'delivered');
+    let activePOs = allPOs.filter(po => po.status !== 'completed' && po.status !== 'in-transit' && po.status !== 'delivered');
+
+    // Strict date rule: Only rebalance POs that are current date OR earliest existing date
+    const strictDatePOs = [];
+    const onHoldDatePOs = [];
+
+    activePOs.forEach(po => {
+      const isAllowedDate = po.deliveryDate === currentDate ||
+                           (earliestExistingDate && po.deliveryDate === earliestExistingDate);
+
+      if (isAllowedDate) {
+        strictDatePOs.push(po);
+      } else {
+        onHoldDatePOs.push(po);
+      }
+    });
+
+    // Update active POs to only include those allowed by date rules
+    activePOs = strictDatePOs;
     
     // Rule 1: Delivery Date Priority - Group by delivery date, process earliest first
     const posByDate = {};
@@ -652,6 +688,21 @@ export const VehicleProvider = ({ children }) => {
         });
       }
 
+      // Place POs on hold due to strict date rule (not current or earliest date)
+      for (const dateHoldPO of onHoldDatePOs) {
+        await updateDoc(doc(db, 'pos', dateHoldPO.id), {
+          assignedTruck: null,
+          status: 'on-hold',
+          load: calculateLoad(dateHoldPO)
+        });
+
+        await addDoc(collection(db, 'history'), {
+          timestamp: new Date(),
+          action: 'PO Placed On Hold During Rebalance (Date Rule)',
+          details: `PO ${dateHoldPO.customId} placed on hold - delivery date ${dateHoldPO.deliveryDate} is not current date (${currentDate}) or earliest existing date (${earliestExistingDate})`
+        });
+      }
+
       // Place unassignable POs (no vehicle available due to constraints)
       for (const error of errorPOs) {
         await updateDoc(doc(db, 'pos', error.po.id), {
@@ -666,13 +717,15 @@ export const VehicleProvider = ({ children }) => {
           details: `PO ${error.po.customId} marked unassignable - ${error.reason}`
         });
       }
-      
+
       // Generate result message
-      const totalErrors = errorPOs.length + onHoldPOs.length;
+      const totalOnHold = onHoldPOs.length + onHoldDatePOs.length;
+      const totalErrors = errorPOs.length + totalOnHold;
+
       if (totalErrors > 0) {
-        return `Rebalancing Error: ${totalErrors} PO(s) cannot be assigned to any available vehicle due to dimension or capacity constraints. Please review manually.\n\nSuccessfully assigned: ${assignmentResults.length} PO(s)\nOn hold: ${onHoldPOs.length} PO(s)\nErrors: ${errorPOs.length} PO(s)`;
+        return `Rebalancing completed with issues: ${totalErrors} PO(s) cannot be assigned.\n\nSuccessfully assigned: ${assignmentResults.length} PO(s)\nOn hold (date rule): ${onHoldDatePOs.length} PO(s)\nOn hold (cluster conflict): ${onHoldPOs.length} PO(s)\nUnassignable: ${errorPOs.length} PO(s)`;
       }
-      
+
       return `Load rebalancing completed successfully!\n\nAssigned: ${assignmentResults.length} PO(s) across ${new Set(assignmentResults.map(a => a.vehicle)).size} vehicle(s)`;
       
     } catch (error) {

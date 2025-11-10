@@ -5,6 +5,7 @@ import { useVehicles } from '../contexts/VehicleContext';
 import NotificationDialog from '../components/NotificationDialog';
 import ConfirmDialog from '../components/ConfirmDialog';
 import './POMonitoring.css';
+import './VehicleMonitoring.css';
 
 const products = {
   'Interfolded': {
@@ -133,6 +134,139 @@ const POMonitoring = () => {
     status: 'pending'
   });
 
+  // Forecasting section state
+  const [forecastingDate, setForecastingDate] = useState('');
+  const [forecastingVehicles, setForecastingVehicles] = useState([]);
+
+  // Function to simulate vehicle loading for On-Hold POs on selected date
+  const simulateForecasting = useCallback((selectedDate) => {
+    if (!selectedDate) {
+      setForecastingVehicles([]);
+      return;
+    }
+
+    // Get all On-Hold POs with the selected delivery date
+    const onHoldPOsForDate = pos.filter(po =>
+      po.status === 'on-hold' && po.deliveryDate === selectedDate
+    );
+
+    if (onHoldPOsForDate.length === 0) {
+      setForecastingVehicles([]);
+      return;
+    }
+
+    // Create a copy of vehicles for simulation (all vehicles are available for forecasting)
+    const simulationVehicles = vehicles.map(vehicle => ({
+      ...vehicle,
+      status: 'Available', // Assume all vehicles are available for forecasting
+      currentLoad: 0,
+      assignedPOs: []
+    }));
+
+    // Sort POs by load size (largest first for better packing)
+    const sortedPOs = [...onHoldPOsForDate].sort((a, b) => {
+      const loadA = a.products.reduce((total, item) => {
+        const product = products[item.product];
+        if (!product) return total;
+        let itemSize = 0;
+        if (item.pricingType === 'perPackage') {
+          const packaging = product.packaging;
+          if (Array.isArray(packaging)) {
+            const selectedPackaging = packaging.find(p => p.quantity === item.packageQuantity) || packaging[0];
+            itemSize = selectedPackaging.size;
+          } else {
+            itemSize = packaging.size;
+          }
+        } else if (item.pricingType === 'perPiece') {
+          itemSize = product.size;
+        }
+        return total + (item.quantity * itemSize);
+      }, 0);
+
+      const loadB = b.products.reduce((total, item) => {
+        const product = products[item.product];
+        if (!product) return total;
+        let itemSize = 0;
+        if (item.pricingType === 'perPackage') {
+          const packaging = product.packaging;
+          if (Array.isArray(packaging)) {
+            const selectedPackaging = packaging.find(p => p.quantity === item.packageQuantity) || packaging[0];
+            itemSize = selectedPackaging.size;
+          } else {
+            itemSize = packaging.size;
+          }
+        } else if (item.pricingType === 'perPiece') {
+          itemSize = product.size;
+        }
+        return total + (item.quantity * itemSize);
+      }, 0);
+
+      return loadB - loadA;
+    });
+
+    // Simulate assignment using simplified logic
+    const simulationResults = [];
+
+    for (const po of sortedPOs) {
+      const load = po.products.reduce((total, item) => {
+        const product = products[item.product];
+        if (!product) return total;
+        let itemSize = 0;
+        if (item.pricingType === 'perPackage') {
+          const packaging = product.packaging;
+          if (Array.isArray(packaging)) {
+            const selectedPackaging = packaging.find(p => p.quantity === item.packageQuantity) || packaging[0];
+            itemSize = selectedPackaging.size;
+          } else {
+            itemSize = packaging.size;
+          }
+        } else if (item.pricingType === 'perPiece') {
+          itemSize = product.size;
+        }
+        return total + (item.quantity * itemSize);
+      }, 0);
+
+      // Find the best available vehicle (simplified: first one that can fit)
+      const availableVehicle = simulationVehicles.find(vehicle =>
+        vehicle.capacity >= vehicle.currentLoad + load
+      );
+
+      if (availableVehicle) {
+        // Find the vehicle in simulation results
+        let vehicleResult = simulationResults.find(v => v.id === availableVehicle.id);
+        if (!vehicleResult) {
+          vehicleResult = {
+            ...availableVehicle,
+            simulatedLoad: 0,
+            simulatedPOs: []
+          };
+          simulationResults.push(vehicleResult);
+        }
+
+        // Add PO to vehicle's simulated load
+        vehicleResult.simulatedLoad += load;
+        vehicleResult.simulatedPOs.push({
+          ...po,
+          simulatedLoad: load
+        });
+      }
+    }
+
+    // Calculate utilization for each vehicle
+    simulationResults.forEach(vehicle => {
+      vehicle.simulatedUtilization = (vehicle.simulatedLoad / vehicle.capacity) * 100;
+    });
+
+    setForecastingVehicles(simulationResults);
+  }, [pos, vehicles]);
+
+  // Handle forecasting date change
+  const handleForecastingDateChange = useCallback((e) => {
+    const selectedDate = e.target.value;
+    setForecastingDate(selectedDate);
+    simulateForecasting(selectedDate);
+  }, [simulateForecasting]);
+
   useEffect(() => {
     const q = query(collection(db, 'pos'), orderBy('createdAt'));
     const unsubscribe = onSnapshot(
@@ -242,15 +376,31 @@ const POMonitoring = () => {
 
     for (const po of assignedPOs) {
       // Try to reassign this PO to another available vehicle
-      const reassignedVehicle = assignVehicleAutomatically({
+      const reassignmentResult = assignVehicleAutomatically({
         ...po,
         assignedTruck: null // Clear current assignment
       });
 
-      if (reassignedVehicle) {
-        // Update the PO with new assignment
+      if (reassignmentResult === 'on-hold') {
+        // PO goes on hold due to date-based balancing rules
         await updateDoc(doc(db, 'pos', po.id), {
-          assignedTruck: reassignedVehicle,
+          assignedTruck: null,
+          status: 'on-hold',
+          load: calculateLoad(po)
+        });
+
+        // Log the on-hold status
+        await addDoc(collection(db, 'history'), {
+          timestamp: new Date(),
+          action: 'PO Placed On Hold (Driver Unavailable - Date Balancing)',
+          details: `PO ${po.customId} placed on hold from ${vehicle.name} due to date-based balancing rules`
+        });
+
+        console.log(`PO ${po.customId} placed on hold from ${vehicle.name} due to date-based balancing rules`);
+      } else if (reassignmentResult) {
+        // Successfully reassigned to another vehicle
+        await updateDoc(doc(db, 'pos', po.id), {
+          assignedTruck: reassignmentResult,
           load: calculateLoad(po)
         });
 
@@ -258,10 +408,10 @@ const POMonitoring = () => {
         await addDoc(collection(db, 'history'), {
           timestamp: new Date(),
           action: 'Auto-Reassigned PO (Driver Unavailable)',
-          details: `PO ${po.customId} auto-reassigned from ${vehicle.name} to ${reassignedVehicle} due to driver status change`
+          details: `PO ${po.customId} auto-reassigned from ${vehicle.name} to ${reassignmentResult} due to driver status change`
         });
 
-        console.log(`Auto-reassigned PO ${po.customId} from ${vehicle.name} to ${reassignedVehicle}`);
+        console.log(`Auto-reassigned PO ${po.customId} from ${vehicle.name} to ${reassignmentResult}`);
       } else {
         // If no vehicle available, unassign the PO
         await updateDoc(doc(db, 'pos', po.id), {
@@ -578,6 +728,58 @@ const POMonitoring = () => {
   }, []);
 
   const assignVehicleAutomatically = useCallback((po) => {
+    const clusterName = findCluster(po.location);
+
+    // Get all existing delivery dates from assigned POs
+    const existingDeliveryDates = new Set();
+    vehicles.forEach(vehicle => {
+      if (vehicle.assignedPOs && vehicle.assignedPOs.length > 0) {
+        vehicle.assignedPOs.forEach(poId => {
+          const assignedPO = pos.find(p => p.id === poId);
+          if (assignedPO && assignedPO.deliveryDate) {
+            existingDeliveryDates.add(assignedPO.deliveryDate);
+          }
+        });
+      }
+    });
+
+    // Convert to array and sort to find earliest date
+    const sortedExistingDates = Array.from(existingDeliveryDates).sort();
+    const earliestExistingDate = sortedExistingDates.length > 0 ? sortedExistingDates[0] : null;
+    const currentDate = new Date().toISOString().split('T')[0];
+
+    // Strict date rule: Only allow assignment if delivery date is current date OR earliest existing date
+    const isAllowedDate = po.deliveryDate === currentDate ||
+                         (earliestExistingDate && po.deliveryDate === earliestExistingDate);
+
+    if (!isAllowedDate && sortedExistingDates.length > 0) {
+      // PO goes on hold - not current date or earliest date
+      console.log(`PO ${po.customId} placed on hold - delivery date ${po.deliveryDate} is not current date (${currentDate}) or earliest existing date (${earliestExistingDate})`);
+      return 'on-hold';
+    }
+
+    // Rule 7: Check if this cluster is already assigned to a vehicle with a DIFFERENT date
+    // If so, this PO must go on hold (same logic as rebalance)
+    const clusterVehiclesWithDifferentDates = vehicles.filter(v => {
+      if (!v.assignedPOs || v.assignedPOs.length === 0) return false;
+
+      // Check if vehicle has this cluster assigned to a different date
+      return v.assignedPOs.some(poId => {
+        const assignedPO = pos.find(p => p.id === poId);
+        if (!assignedPO) return false;
+
+        const assignedCluster = findCluster(assignedPO.location);
+        return assignedCluster === clusterName && assignedPO.deliveryDate !== po.deliveryDate;
+      });
+    });
+
+    if (clusterVehiclesWithDifferentDates.length > 0) {
+      // PO goes on hold - cluster already assigned to vehicle with different date
+      console.log(`PO ${po.customId} placed on hold - cluster ${clusterName} already assigned to vehicle(s) with different delivery date`);
+      return 'on-hold';
+    }
+
+    // If no conflicts, proceed with normal assignment logic
     const scoredVehicles = scoreVehiclesForPO(po, vehicles, pos);
 
     if (scoredVehicles.length === 0) return null;
@@ -585,7 +787,6 @@ const POMonitoring = () => {
     const chosen = scoredVehicles[0].vehicle;
     const chosenData = scoredVehicles[0];
     const load = calculateLoad(po);
-    const clusterName = findCluster(po.location);
 
     console.log(`Auto-assigning PO ${po.customId} to ${chosen.name}:`, {
       load,
@@ -606,7 +807,7 @@ const POMonitoring = () => {
     });
 
     return chosen.name;
-  }, [scoreVehiclesForPO, vehicles, pos, calculateLoad, getUsedLoadForVehicleOnDate]);
+  }, [scoreVehiclesForPO, vehicles, pos, calculateLoad, getUsedLoadForVehicleOnDate, findCluster]);
 
   const removeProduct = (index) => {
     const updatedProducts = form.products.filter((_, i) => i !== index);
@@ -971,12 +1172,24 @@ const POMonitoring = () => {
           const poId = docRef.id;
 
           // Automate assignment
-          const assignedVehicle = assignVehicleAutomatically({ ...newPO, id: poId });
-          if (assignedVehicle) {
+          const assignmentResult = assignVehicleAutomatically({ ...newPO, id: poId });
+          if (assignmentResult === 'on-hold') {
+            // PO goes on hold due to date-based balancing rules
+            await updateDoc(docRef, { status: 'on-hold', load: newPO.load });
+            newPO.status = 'on-hold';
+
+            // Log on-hold status
+            await addDoc(collection(db, 'history'), {
+              timestamp: new Date(),
+              action: 'PO Placed On Hold (Date Balancing)',
+              details: `PO ${newPO.customId} placed on hold due to date-based balancing rules`
+            });
+          } else if (assignmentResult) {
+            // Successfully assigned to a vehicle
             // Keep Firestore field naming as 'assignedTruck' for backward compatibility
             // Also persist computed load so vehicle loads can be reconstructed after refresh
-            await updateDoc(docRef, { assignedTruck: assignedVehicle, load: newPO.load, status: 'assigned' });
-            newPO.assignedTruck = assignedVehicle;
+            await updateDoc(docRef, { assignedTruck: assignmentResult, load: newPO.load, status: 'assigned' });
+            newPO.assignedTruck = assignmentResult;
             newPO.status = 'assigned';
 
             // assignedPOs and currentLoad already updated via VehicleContext.assignLoad
@@ -985,7 +1198,7 @@ const POMonitoring = () => {
             await addDoc(collection(db, 'history'), {
               timestamp: new Date(),
               action: 'Auto-Assigned PO to Vehicle',
-              details: `PO ${newPO.customId} auto-assigned to ${assignedVehicle}`
+              details: `PO ${newPO.customId} auto-assigned to ${assignmentResult}`
             });
           } else {
             // Set status to on-hold when no vehicle is available
@@ -1110,12 +1323,24 @@ const POMonitoring = () => {
       const poId = docRef.id;
 
       // Automate assignment
-      const assignedVehicle = assignVehicleAutomatically({ ...newPO, id: poId });
-      if (assignedVehicle) {
+      const assignmentResult = assignVehicleAutomatically({ ...newPO, id: poId });
+      if (assignmentResult === 'on-hold') {
+        // PO goes on hold due to date-based balancing rules
+        await updateDoc(docRef, { status: 'on-hold', load: newPO.load });
+        newPO.status = 'on-hold';
+
+        // Log on-hold status
+        await addDoc(collection(db, 'history'), {
+          timestamp: new Date(),
+          action: 'PO Placed On Hold (Date Balancing)',
+          details: `PO ${newPO.customId} placed on hold due to date-based balancing rules`
+        });
+      } else if (assignmentResult) {
+        // Successfully assigned to a vehicle
         // Keep Firestore field naming as 'assignedTruck' for backward compatibility
         // Also persist computed load so vehicle loads can be reconstructed after refresh
-        await updateDoc(docRef, { assignedTruck: assignedVehicle, load: newPO.load, status: 'assigned' });
-        newPO.assignedTruck = assignedVehicle;
+        await updateDoc(docRef, { assignedTruck: assignmentResult, load: newPO.load, status: 'assigned' });
+        newPO.assignedTruck = assignmentResult;
         newPO.status = 'assigned';
 
         // assignedPOs and currentLoad already updated via VehicleContext.assignLoad
@@ -1124,7 +1349,7 @@ const POMonitoring = () => {
         await addDoc(collection(db, 'history'), {
           timestamp: new Date(),
           action: 'Auto-Assigned PO to Vehicle',
-          details: `PO ${newPO.customId} auto-assigned to ${assignedVehicle}`
+          details: `PO ${newPO.customId} auto-assigned to ${assignmentResult}`
         });
       } else {
         // Set status to on-hold when no vehicle is available
@@ -1204,7 +1429,7 @@ const POMonitoring = () => {
       setNotification({
         type: 'success',
         title: 'Purchase Order Created',
-        message: `PO ${newPO.customId} has been successfully created and ${assignedVehicle ? `assigned to ${assignedVehicle}` : 'placed on hold pending vehicle assignment'}.`,
+        message: `PO ${newPO.customId} has been successfully created and ${newPO.status === 'assigned' ? `assigned to ${newPO.assignedTruck}` : newPO.status === 'on-hold' ? 'placed on hold due to date-based balancing rules' : 'placed on hold pending vehicle assignment'}.`,
         autoClose: true,
         autoCloseDelay: 5000,
         showCloseButton: false
@@ -1309,6 +1534,38 @@ const POMonitoring = () => {
   }, [pos, rebalanceLoads]);
 
   const handleAssign = useCallback(async (vehicleId) => {
+    // Get all existing delivery dates from assigned POs
+    const existingDeliveryDates = new Set();
+    vehicles.forEach(vehicle => {
+      if (vehicle.assignedPOs && vehicle.assignedPOs.length > 0) {
+        vehicle.assignedPOs.forEach(poId => {
+          const assignedPO = pos.find(p => p.id === poId);
+          if (assignedPO && assignedPO.deliveryDate) {
+            existingDeliveryDates.add(assignedPO.deliveryDate);
+          }
+        });
+      }
+    });
+
+    // Convert to array and sort to find earliest date
+    const sortedExistingDates = Array.from(existingDeliveryDates).sort();
+    const earliestExistingDate = sortedExistingDates.length > 0 ? sortedExistingDates[0] : null;
+    const currentDate = new Date().toISOString().split('T')[0];
+
+    // Strict date rule: Only allow assignment if delivery date is current date OR earliest existing date
+    const isAllowedDate = selectedPO.deliveryDate === currentDate ||
+                         (earliestExistingDate && selectedPO.deliveryDate === earliestExistingDate);
+
+    if (!isAllowedDate && sortedExistingDates.length > 0) {
+      setNotification({
+        type: 'error',
+        title: 'Date Restriction',
+        message: `Cannot assign PO with delivery date ${selectedPO.deliveryDate}. Only current date (${currentDate}) or earliest existing date (${earliestExistingDate}) are allowed.`,
+        showCloseButton: true
+      });
+      return;
+    }
+
     const load = calculateLoad(selectedPO);
     const vehicle = vehicles.find(v => v.id === vehicleId);
     if (vehicle) {
@@ -1361,7 +1618,6 @@ const POMonitoring = () => {
 
         // Track assignment; keep global ready unchanged
         // Ensure we don't exceed 100% capacity
-        const usedForDate = getUsedLoadForVehicleOnDate(vehicle, selectedPO.deliveryDate);
         const newLoad = Math.min(usedForDate + load, vehicle.capacity);
 
         updateVehicle(vehicleId, {
@@ -1386,7 +1642,7 @@ const POMonitoring = () => {
         });
       }
     }
-  }, [selectedPO, vehicles, calculateLoad, getUsedLoadForVehicleOnDate, getClusterForVehicleOnDate, updateVehicle]);
+  }, [selectedPO, vehicles, pos, calculateLoad, getUsedLoadForVehicleOnDate, getClusterForVehicleOnDate, updateVehicle]);
 
   return (
     <div className="po-monitoring">
@@ -1854,6 +2110,77 @@ const POMonitoring = () => {
           );
         })}
       </div>
+
+      {/* Forecasting Section */}
+      <div className="forecasting-section">
+        <h2>Forecasting</h2>
+        <div className="forecasting-controls">
+          <div className="input-group">
+            <label>Select Delivery Date for Forecasting:</label>
+            <input
+              type="date"
+              value={forecastingDate}
+              onChange={handleForecastingDateChange}
+              min={new Date().toISOString().split('T')[0]}
+            />
+          </div>
+        </div>
+
+        {forecastingDate && (
+          <div className="forecasting-results">
+            <h3>Vehicle Loading Forecast for {forecastingDate}</h3>
+            {forecastingVehicles.length > 0 ? (
+              <div className="forecasting-vehicles grid">
+                {forecastingVehicles.map(vehicle => (
+                  <div key={vehicle.id} className="card forecasting-vehicle-card">
+                    <div className="card-header">
+                      <div>
+                        <div className="card-title">{vehicle.name}</div>
+                        <div className="card-subtitle">Plate: {vehicle.plateNumber}</div>
+                      </div>
+                      <div className="badge forecast">
+                        <span className="dot"></span>
+                        Forecast
+                      </div>
+                    </div>
+                    <div className="card-meta">Driver: {vehicle.driver}</div>
+                    <div className="progress" aria-label="Forecasted load utilization">
+                      <span style={{
+                        width: `${Math.min(vehicle.simulatedUtilization, 100)}%`,
+                        backgroundColor: vehicle.simulatedUtilization > 90 ? '#ff6b6b' :
+                                       vehicle.simulatedUtilization > 75 ? '#ffa726' : '#4caf50'
+                      }} />
+                    </div>
+                    <div className="card-footer">
+                      <span className="card-meta">
+                        {vehicle.simulatedUtilization.toFixed(1)}% utilized •
+                        {vehicle.simulatedLoad.toLocaleString()} cm³ •
+                        {vehicle.simulatedPOs.length} POs
+                      </span>
+                    </div>
+                    <div className="forecasting-pos">
+                      <h4>Assigned POs:</h4>
+                      {vehicle.simulatedPOs.map(po => (
+                        <div key={po.id} className="forecasting-po-item">
+                          <span className="po-id">PO {po.customId}</span>
+                          <span className="po-company">{po.companyName}</span>
+                          <span className="po-load">{po.simulatedLoad.toLocaleString()} cm³</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="no-forecasting-data">
+                <p>No On-Hold POs found for the selected delivery date.</p>
+                <p>Select a different date or check if there are POs with "On-Hold" status that have the selected delivery date.</p>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
       {showModal && selectedPO && (
         <div className="modal">
           <div className="modal-content po-detail-modal">

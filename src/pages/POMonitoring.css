@@ -319,8 +319,8 @@
 
 /* Kiosk-style modal styles */
 .kiosk-modal {
-  max-width: 1200px;
-  width: 95%;
+  max-width: 900px;
+  width: 90%;
   max-height: 90vh;
   overflow-y: auto;
   display: flex;
@@ -1209,4 +1209,151 @@
   font-weight: 600;
   z-index: 10;
   box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+}
+
+/* Forecasting Section Styles */
+.forecasting-section {
+  margin-top: 40px;
+  padding: 20px;
+  background: var(--panel);
+  border-radius: 12px;
+  border: var(--border);
+}
+
+.forecasting-section h2 {
+  margin: 0 0 20px 0;
+  color: var(--text);
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.forecasting-controls {
+  margin-bottom: 20px;
+}
+
+.forecasting-controls .input-group {
+  max-width: 300px;
+}
+
+.forecasting-controls label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+
+.forecasting-controls input[type="date"] {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 8px;
+  font-size: 14px;
+  background: rgba(0,0,0,0.06);
+  color: var(--text);
+  appearance: none;
+}
+
+.forecasting-controls input[type="date"]:focus {
+  outline: none;
+  border-color: rgba(255,255,255,0.22);
+  box-shadow: 0 0 0 3px rgba(185,28,28,0.25);
+  background: rgba(0,0,0,0.08);
+}
+
+.forecasting-results h3 {
+  margin: 0 0 20px 0;
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.forecasting-vehicles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.forecasting-vehicle-card {
+  background: var(--card-bg);
+  border: var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  transition: box-shadow 0.2s, border-color 0.2s;
+}
+
+.forecasting-vehicle-card:hover {
+  box-shadow: var(--shadow);
+  border-color: rgba(255,255,255,0.14);
+}
+
+.forecasting-vehicle-card .badge.forecast {
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  color: white;
+}
+
+.forecasting-pos {
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 1px solid var(--border-color, rgba(255,255,255,0.1));
+}
+
+.forecasting-pos h4 {
+  margin: 0 0 10px 0;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.forecasting-po-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-color, rgba(255,255,255,0.05));
+}
+
+.forecasting-po-item:last-child {
+  border-bottom: none;
+}
+
+.forecasting-po-item .po-id {
+  font-weight: 600;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.forecasting-po-item .po-company {
+  color: var(--muted);
+  font-size: 12px;
+  flex: 1;
+  text-align: center;
+}
+
+.forecasting-po-item .po-load {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.no-forecasting-data {
+  text-align: center;
+  padding: 40px 20px;
+  background: var(--card-bg);
+  border: var(--border);
+  border-radius: 12px;
+  color: var(--muted);
+}
+
+.no-forecasting-data p {
+  margin: 10px 0;
+  font-size: 16px;
+}
+
+.no-forecasting-data p:first-child {
+  font-weight: 600;
+  color: var(--text);
 }
