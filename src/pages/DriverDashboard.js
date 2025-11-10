@@ -5,7 +5,41 @@ import { db } from '../firebase';
 import { useVehicles } from '../contexts/VehicleContext';
 import NotificationDialog from '../components/NotificationDialog';
 import ConfirmDialog from '../components/ConfirmDialog';
+import logo from '../companyLogo.png';
 import './DriverDashboard.css';
+
+// Icons as SVG components (same as DriverInfo)
+const UserIcon = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+    <circle cx="12" cy="7" r="4"/>
+  </svg>
+);
+
+const PhoneIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+  </svg>
+);
+
+const TruckIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/>
+    <path d="M15 18H9"/>
+    <path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14"/>
+    <circle cx="17" cy="18" r="2"/>
+    <circle cx="7" cy="18" r="2"/>
+  </svg>
+);
+
+const UsersIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+    <circle cx="9" cy="7" r="4"/>
+    <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+    <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+  </svg>
+);
 
 const products = {
   'Interfolded': {
@@ -340,11 +374,44 @@ const DriverDashboard = () => {
   return (
     <div className="driver-dashboard">
       <header className="dashboard-header">
-        <h1>Driver Dashboard</h1>
+        <div className="dashboard-logo-section">
+          <img src={logo} alt="HILTAC Logo" className="dashboard-logo" />
+          <div className="dashboard-text">
+            <h1 className="dashboard-title">HILTAC</h1>
+            <p className="dashboard-subtitle">Manufacturing and Trading Inc.</p>
+          </div>
+        </div>
         <div className="header-actions">
-          <button className="btn" onClick={toggleTheme}>
-            {theme === 'light' ? 'Dark Mode' : 'Light Mode'}
-          </button>
+          <label className="theme-switch">
+            <input
+              type="checkbox"
+              className="theme-switch__checkbox"
+              checked={theme === 'dark'}
+              onChange={toggleTheme}
+            />
+            <div className="theme-switch__container">
+              <div className="theme-switch__circle-container">
+                <div className="theme-switch__sun-moon-container">
+                  <div className="theme-switch__moon">
+                    <div className="theme-switch__spot"></div>
+                    <div className="theme-switch__spot"></div>
+                    <div className="theme-switch__spot"></div>
+                  </div>
+                </div>
+              </div>
+              <div className="theme-switch__clouds">
+                <div className="theme-switch__stars-container">
+                  <svg className="theme-switch__stars" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+                    <path d="M10 40 L12 42 L10 44 L8 42 Z"/>
+                    <path d="M25 30 L27 32 L25 34 L23 32 Z"/>
+                    <path d="M40 35 L42 37 L40 39 L38 37 Z"/>
+                    <path d="M60 25 L62 27 L60 29 L58 27 Z"/>
+                    <path d="M75 40 L77 42 L75 44 L73 42 Z"/>
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </label>
           <button className="btn btn-secondary" onClick={handleLogout}>
             Logout
           </button>
@@ -353,55 +420,71 @@ const DriverDashboard = () => {
 
       <div className="dashboard-content">
         <div className="welcome-card card">
-          <h2>Welcome, {loggedInDriver.name}</h2>
-          <p><strong>Vehicle:</strong> {loggedInDriver.vehicle}</p>
-          {(() => {
-            // Get driver details from the same data structure used in DriverInfo
-            const driverDetails = {
-              'Randy Maduro': {
-                contactNumber: '09154080447',
-                helpers: [
-                  { name: 'Marvin Soriano', contactNumber: '09169334034' },
-                  { name: 'Raymond Marbella', contactNumber: 'N/A' }
-                ]
-              },
-              'Adrian Silao': {
-                contactNumber: '09096835513',
-                helpers: [
-                  { name: 'Randolph Villamor', contactNumber: '09123305204' }
-                ]
-              },
-              'Fernando Besa': {
-                contactNumber: '09551453174',
-                helpers: [
-                  { name: 'Noel Bulahog', contactNumber: '09702937219' }
-                ]
-              },
-              'Joseph Allan Saldivar': {
-                contactNumber: '09751432072',
-                helpers: [
-                  { name: 'Ronilo Ligao', contactNumber: '09932977963' }
-                ]
-              }
-            };
-
-            const details = driverDetails[loggedInDriver.name];
-            return details ? (
-              <div className="driver-details">
-                <p><strong>Contact Number:</strong> {details.contactNumber}</p>
-                {details.helpers && details.helpers.length > 0 && (
-                  <div className="dashboard-helpers">
-                    {details.helpers.map((helper, index) => (
-                      <div key={index} className="helper-detail">
-                        <p><strong>Truck Helper:</strong> {helper.name}</p>
-                        <p><strong>Contact Number:</strong> {helper.contactNumber}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
+          <div className="welcome-content">
+            <h2>Welcome, {loggedInDriver.name}</h2>
+            <div className="welcome-details">
+              <div className="detail-item">
+                <TruckIcon />
+                <span><strong>Vehicle:</strong> {loggedInDriver.vehicle}</span>
               </div>
-            ) : null;
-          })()}
+              {(() => {
+                // Get driver details from the same data structure used in DriverInfo
+                const driverDetails = {
+                  'Randy Maduro': {
+                    contactNumber: '09154080447',
+                    helpers: [
+                      { name: 'Marvin Soriano', contactNumber: '09169334034' },
+                      { name: 'Raymond Marbella', contactNumber: 'N/A' }
+                    ]
+                  },
+                  'Adrian Silao': {
+                    contactNumber: '09096835513',
+                    helpers: [
+                      { name: 'Randolph Villamor', contactNumber: '09123305204' }
+                    ]
+                  },
+                  'Fernando Besa': {
+                    contactNumber: '09551453174',
+                    helpers: [
+                      { name: 'Noel Bulahog', contactNumber: '09702937219' }
+                    ]
+                  },
+                  'Joseph Allan Saldivar': {
+                    contactNumber: '09751432072',
+                    helpers: [
+                      { name: 'Ronilo Ligao', contactNumber: '09932977963' }
+                    ]
+                  }
+                };
+
+                const details = driverDetails[loggedInDriver.name];
+                return details ? (
+                  <>
+                    <div className="detail-item">
+                      <PhoneIcon />
+                      <span><strong>Contact:</strong> {details.contactNumber}</span>
+                    </div>
+                    {details.helpers && details.helpers.length > 0 && (
+                      <div className="helpers-section">
+                        <div className="helpers-header">
+                          <UsersIcon />
+                          <span><strong>Truck Helpers:</strong></span>
+                        </div>
+                        <div className="helpers-list">
+                          {details.helpers.map((helper, index) => (
+                            <div key={index} className="helper-item">
+                              <span className="helper-name">{helper.name}</span>
+                              <span className="helper-contact">({helper.contactNumber})</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : null;
+              })()}
+            </div>
+          </div>
         </div>
 
         <div className="status-card card">

@@ -50,6 +50,24 @@
   display: flex;
   gap: 15px;
   margin-bottom: 20px;
+  margin-top: 10px;
+  position: relative;
+  z-index: 10;
+}
+
+/* Responsive styles for mobile */
+@media (max-width: 768px) {
+  .header-actions {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .add-po-btn,
+  .rebalance-btn {
+    width: 100%;
+    justify-content: center;
+  }
 }
 
 .add-po-btn {

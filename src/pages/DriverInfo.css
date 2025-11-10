@@ -1,93 +1,295 @@
 .driver-info {
   margin-left: 270px;
-  padding: 20px;
+  padding: 24px;
+  max-width: 1200px;
 }
 
-.driver-form {
+.driver-info-header {
+  margin-bottom: 32px;
+}
+
+.driver-info-header h1 {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 8px 0;
+  letter-spacing: -0.5px;
+}
+
+.driver-info-subtitle {
+  font-size: 16px;
+  color: var(--muted);
+  margin: 0;
+  font-weight: 400;
+}
+
+
+
+/* Driver Cards */
+.driver-list {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+}
+
+.driver-card {
+  background: var(--card-bg);
+  border: var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  transition: transform 200ms ease, box-shadow 200ms ease, border-color 200ms ease;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.driver-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-hover);
+  border-color: rgba(255,255,255,0.14);
+}
+
+.driver-card-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 20px 16px 20px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.driver-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  flex-shrink: 0;
+}
+
+.driver-avatar svg {
+  width: 24px;
+  height: 24px;
+}
+
+.driver-basic-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.driver-name {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0 0 6px 0;
+  letter-spacing: -0.2px;
+}
+
+.driver-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.driver-status.success {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--success);
+}
+
+.driver-status.danger {
+  background: rgba(185, 28, 28, 0.1);
+  color: var(--danger);
+}
+
+.driver-status.transit {
+  background: rgba(139, 92, 246, 0.1);
+  color: #8b5cf6;
+}
+
+.driver-status.warning {
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--warning);
+}
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.driver-card-content {
+  padding: 16px 20px 20px 20px;
+}
+
+.info-section {
   display: flex;
   flex-direction: column;
   gap: 12px;
   margin-bottom: 20px;
 }
 
-/* Form fields */
-.driver-form input,
-.driver-form select {
-  width: 100%;
-  max-width: 480px;
-  box-sizing: border-box;
-  display: block;
-  padding: 10px 12px;
-  border-radius: 10px;
-  border: 1px solid rgba(255,255,255,0.14);
-  background: rgba(0,0,0,0.06);
-  color: var(--text);
-  outline: none;
-  appearance: none;
-  transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+.info-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+}
+
+.info-item svg {
+  width: 18px;
+  height: 18px;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.info-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.info-label {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.info-value {
   font-size: 14px;
+  color: var(--text);
+  font-weight: 500;
 }
 
-.driver-form select option {
-  background: white;
-  color: #0f172a;
+
+
+.helpers-section {
+  border-top: 1px solid rgba(255,255,255,0.06);
+  padding-top: 16px;
 }
 
-[data-theme='dark'] .driver-form select option {
-  background: black;
-  color: #e5e7eb;
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
 }
 
-.driver-form input::placeholder {
-  color: rgba(229,231,235,0.5);
+.section-header svg {
+  width: 16px;
+  height: 16px;
+  color: var(--muted);
 }
 
-.driver-form input:focus,
-.driver-form select:focus {
-  border-color: rgba(255,255,255,0.22);
-  box-shadow: 0 0 0 3px rgba(185,28,28,0.25);
-  background: rgba(0,0,0,0.08);
-}
-
-/* Light theme input styles */
-[data-theme='light'] .driver-form input,
-[data-theme='light'] .driver-form select {
-  border-color: rgba(0,0,0,0.16);
-  background: rgba(0,0,0,0.04);
-}
-
-[data-theme='light'] .driver-form input::placeholder {
-  color: rgba(0,0,0,0.4);
-}
-
-[data-theme='light'] .driver-form input:focus,
-[data-theme='light'] .driver-form select:focus {
-  border-color: rgba(185,28,28,0.4);
-  box-shadow: 0 0 0 3px rgba(185,28,28,0.15);
-  background: rgba(0,0,0,0.02);
-}
-
-/* Form submit button */
-.driver-form button[type="submit"] {
-  width: fit-content;
-  padding: 8px 14px;
-  border-radius: 10px;
-  border: none;
-  background: linear-gradient(180deg, var(--primary), var(--primary-dark));
-  color: #fff;
+.section-title {
+  font-size: 14px;
   font-weight: 600;
-}
-/* Cards use global .card styles now; keep fallback for any legacy elements */
-.driver-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 16px;
+  color: var(--text);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
-.driver-card {
-  background: var(--panel);
-  border: var(--border);
-  border-radius: 12px;
-  padding: 14px;
-  box-shadow: var(--shadow);
+.helpers-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.helper-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: rgba(255,255,255,0.02);
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.04);
+}
+
+.helper-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.helper-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.helper-contact {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* Light theme adjustments */
+[data-theme='light'] .driver-card {
+  background: rgba(255,255,255,0.8);
+}
+
+[data-theme='light'] .helper-item {
+  background: rgba(0,0,0,0.02);
+  border-color: rgba(0,0,0,0.06);
+}
+
+[data-theme='light'] .driver-card-header {
+  border-bottom-color: rgba(0,0,0,0.06);
+}
+
+[data-theme='light'] .helpers-section {
+  border-top-color: rgba(0,0,0,0.06);
+}
+
+/* Responsive design */
+@media (max-width: 1200px) {
+  .driver-list {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+  }
+}
+
+@media (max-width: 768px) {
+  .driver-info {
+    margin-left: 0;
+    padding: 16px;
+  }
+
+  .driver-info-header h1 {
+    font-size: 24px;
+  }
+
+  .driver-list {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .driver-card-header {
+    padding: 16px 16px 12px 16px;
+  }
+
+  .driver-card-content {
+    padding: 12px 16px 16px 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .driver-card-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .driver-basic-info {
+    width: 100%;
+  }
 }

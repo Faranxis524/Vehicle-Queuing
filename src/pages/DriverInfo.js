@@ -4,6 +4,39 @@ import { db } from '../firebase';
 import { useVehicles } from '../contexts/VehicleContext';
 import './DriverInfo.css';
 
+// Icons as SVG components
+const PhoneIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+  </svg>
+);
+
+const TruckIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/>
+    <path d="M15 18H9"/>
+    <path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14"/>
+    <circle cx="17" cy="18" r="2"/>
+    <circle cx="7" cy="18" r="2"/>
+  </svg>
+);
+
+const UserIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+    <circle cx="12" cy="7" r="4"/>
+  </svg>
+);
+
+const UsersIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+    <circle cx="9" cy="7" r="4"/>
+    <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+    <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+  </svg>
+);
+
 // Extended driver information with contact details and helpers
 const driverDetails = {
   'Randy Maduro': {
@@ -77,41 +110,72 @@ const DriverInfo = () => {
 
   return (
     <div className="driver-info">
-      <h1>Driver Info</h1>
-      <div className="driver-list grid">
+      <div className="driver-info-header">
+        <h1>Driver Information</h1>
+      </div>
+
+      <div className="driver-list">
         {drivers.map(driver => {
           const details = driverDetails[driver.name];
+          const statusClass = driver.status === 'Available' ? 'success' :
+                            driver.status === 'Unavailable' ? 'danger' :
+                            driver.status === 'In-transit' ? 'transit' : 'warning';
+
           return (
-            <div key={driver.id} className="card" title={`${driver.name} • ${driver.vehicle || 'Unassigned'}`}>
-              <div className="card-header">
-                <div>
-                  <div className="card-title">{driver.name}</div>
-                  <div className="card-subtitle">Vehicle: {driver.vehicle || '—'}</div>
+            <div key={driver.id} className="driver-card">
+              <div className="driver-card-header">
+                <div className="driver-avatar">
+                  <UserIcon />
                 </div>
-                <div className={`badge ${driver.status === 'Available' ? 'success' : (driver.status === 'Unavailable' ? 'danger' : (driver.status === 'In-transit' ? 'transit' : 'warning'))}`}>
-                  <span className="dot"></span>
-                  {driver.status || 'Not Set'}
+                <div className="driver-basic-info">
+                  <h3 className="driver-name">{driver.name}</h3>
+                  <div className={`driver-status ${statusClass}`}>
+                    <span className="status-dot"></span>
+                    {driver.status || 'Not Set'}
+                  </div>
                 </div>
               </div>
 
-              {details && (
-                <div className="card-content">
-                  <div className="driver-contact">
-                    <p><strong>Contact Number:</strong> {details.contactNumber}</p>
+              <div className="driver-card-content">
+                <div className="info-section">
+                  <div className="info-item">
+                    <TruckIcon />
+                    <div className="info-content">
+                      <span className="info-label">Vehicle</span>
+                      <span className="info-value">{driver.vehicle || 'Unassigned'}</span>
+                    </div>
                   </div>
 
-                  {details.helpers && details.helpers.length > 0 && (
-                    <div className="truck-helpers">
-                      {details.helpers.map((helper, index) => (
-                        <div key={index} className="helper-info">
-                          <p><strong>Truck Helper:</strong> {helper.name}</p>
-                          <p><strong>Contact Number:</strong> {helper.contactNumber}</p>
-                        </div>
-                      ))}
+                  {details?.contactNumber && (
+                    <div className="info-item">
+                      <PhoneIcon />
+                      <div className="info-content">
+                        <span className="info-label">Contact</span>
+                        <span className="info-value">{details.contactNumber}</span>
+                      </div>
                     </div>
                   )}
                 </div>
-              )}
+
+                {details?.helpers && details.helpers.length > 0 && (
+                  <div className="helpers-section">
+                    <div className="section-header">
+                      <UsersIcon />
+                      <span className="section-title">Truck Helpers</span>
+                    </div>
+                    <div className="helpers-list">
+                      {details.helpers.map((helper, index) => (
+                        <div key={index} className="helper-item">
+                          <div className="helper-info">
+                            <span className="helper-name">{helper.name}</span>
+                            <span className="helper-contact">{helper.contactNumber}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           );
         })}

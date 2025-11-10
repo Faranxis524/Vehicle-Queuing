@@ -79,9 +79,36 @@ const DriverLogin = () => {
     <div className="driver-login">
       <div className="login-header">
         <h1>Driver Login</h1>
-        <button className="btn" onClick={toggleTheme}>
-          {theme === 'light' ? 'Dark Mode' : 'Light Mode'}
-        </button>
+        <label className="theme-switch">
+          <input
+            type="checkbox"
+            className="theme-switch__checkbox"
+            checked={theme === 'dark'}
+            onChange={toggleTheme}
+          />
+          <div className="theme-switch__container">
+            <div className="theme-switch__circle-container">
+              <div className="theme-switch__sun-moon-container">
+                <div className="theme-switch__moon">
+                  <div className="theme-switch__spot"></div>
+                  <div className="theme-switch__spot"></div>
+                  <div className="theme-switch__spot"></div>
+                </div>
+              </div>
+            </div>
+            <div className="theme-switch__clouds">
+              <div className="theme-switch__stars-container">
+                <svg className="theme-switch__stars" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+                  <path d="M10 40 L12 42 L10 44 L8 42 Z"/>
+                  <path d="M25 30 L27 32 L25 34 L23 32 Z"/>
+                  <path d="M40 35 L42 37 L40 39 L38 37 Z"/>
+                  <path d="M60 25 L62 27 L60 29 L58 27 Z"/>
+                  <path d="M75 40 L77 42 L75 44 L73 42 Z"/>
+                </svg>
+              </div>
+            </div>
+          </div>
+        </label>
       </div>
       <div className="login-form">
         <input
