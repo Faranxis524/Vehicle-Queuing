@@ -417,7 +417,14 @@ const POMonitoring = () => {
           // If vehicle has a different cluster for this date, it's not available
           return false;
         })
-        .sort((a, b) => a.simulatedUtilization - b.simulatedUtilization); // Sort by lowest utilization first
+        .sort((a, b) => {
+          // First sort by capacity (smallest first)
+          if (a.capacity !== b.capacity) {
+            return a.capacity - b.capacity;
+          }
+          // Then by lowest utilization
+          return a.simulatedUtilization - b.simulatedUtilization;
+        });
 
       if (availableVehicles.length > 0) {
         const selectedVehicle = availableVehicles[0]; // Choose the one with lowest utilization
@@ -1042,40 +1049,48 @@ const POMonitoring = () => {
 
     if (eligibleVehicles.length === 0) return null;
 
-    // Select the best vehicle using the same scoring logic as rebalance loads
-    const scoredVehicles = eligibleVehicles.map(v => {
-      // Get all POs currently assigned to this vehicle
-      const assignedPOs = v.assignedPOs.map(poId => pos.find(p => p.id === poId)).filter(Boolean);
-      const currentLoad = assignedPOs.reduce((total, assignedPO) => total + calculateLoad(assignedPO), 0);
-      const remainingCapacity = v.capacity - currentLoad;
-      const utilizationAfter = (currentLoad + load) / v.capacity;
+    // Select the best vehicle using the same scoring logic as rebalance loads, but prioritize smaller vehicles first
+    const scoredVehicles = eligibleVehicles
+      .sort((a, b) => a.capacity - b.capacity) // Sort by capacity ascending (smallest first)
+      .map(v => {
+        // Get all POs currently assigned to this vehicle
+        const assignedPOs = v.assignedPOs.map(poId => pos.find(p => p.id === poId)).filter(Boolean);
+        const currentLoad = assignedPOs.reduce((total, assignedPO) => total + calculateLoad(assignedPO), 0);
+        const remainingCapacity = v.capacity - currentLoad;
+        const utilizationAfter = (currentLoad + load) / v.capacity;
 
-      // Prefer vehicles already serving this cluster/date combination
-      const alreadyServingCluster = assignedPOs.some(assignedPO =>
-        assignedPO.deliveryDate === po.deliveryDate && findCluster(assignedPO.location) === clusterName
-      ) ? 10 : 0;
+        // Prefer vehicles already serving this cluster/date combination
+        const alreadyServingCluster = assignedPOs.some(assignedPO =>
+          assignedPO.deliveryDate === po.deliveryDate && findCluster(assignedPO.location) === clusterName
+        ) ? 10 : 0;
 
-      // Prefer good utilization (70-90%)
-      let utilizationScore = 0;
-      if (utilizationAfter >= 0.7 && utilizationAfter <= 0.9) {
-        utilizationScore = 5;
-      } else if (utilizationAfter >= 0.5 && utilizationAfter < 0.7) {
-        utilizationScore = 3;
-      } else if (utilizationAfter > 0.9 && utilizationAfter <= 0.95) {
-        utilizationScore = 2;
-      } else if (utilizationAfter < 0.5) {
-        utilizationScore = 1;
+        // Prefer good utilization (70-90%)
+        let utilizationScore = 0;
+        if (utilizationAfter >= 0.7 && utilizationAfter <= 0.9) {
+          utilizationScore = 5;
+        } else if (utilizationAfter >= 0.5 && utilizationAfter < 0.7) {
+          utilizationScore = 3;
+        } else if (utilizationAfter > 0.9 && utilizationAfter <= 0.95) {
+          utilizationScore = 2;
+        } else if (utilizationAfter < 0.5) {
+          utilizationScore = 1;
+        }
+
+        return {
+          vehicle: v,
+          score: alreadyServingCluster + utilizationScore,
+          utilizationAfter
+        };
+      });
+
+    // Sort by score (highest first), but maintain capacity order for equal scores
+    scoredVehicles.sort((a, b) => {
+      if (b.score !== a.score) {
+        return b.score - a.score;
       }
-
-      return {
-        vehicle: v,
-        score: alreadyServingCluster + utilizationScore,
-        utilizationAfter
-      };
+      // If scores are equal, prefer smaller vehicles
+      return a.vehicle.capacity - b.vehicle.capacity;
     });
-
-    // Sort by score (highest first)
-    scoredVehicles.sort((a, b) => b.score - a.score);
 
     const chosen = scoredVehicles[0].vehicle;
 
@@ -2471,7 +2486,7 @@ const POMonitoring = () => {
           <div className="forecasting-results">
             <h3>Vehicle Loading Forecast for {forecastingDate}</h3>
             <div className="forecasting-vehicles grid">
-              {forecastingVehicles.map(vehicle => (
+              {[...forecastingVehicles].sort((a, b) => a.capacity - b.capacity).map(vehicle => (
                 <div key={vehicle.id} className="card forecasting-vehicle-card">
                   <div className="card-header">
                     <div>

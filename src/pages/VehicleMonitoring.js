@@ -74,7 +74,7 @@ const VehicleMonitoring = () => {
     <div className="vehicle-monitoring">
       <h1>Vehicle Monitoring</h1>
       <div className="vehicle-cards grid">
-        {vehicles.map(vehicle => {
+        {[...vehicles].sort((a, b) => a.capacity - b.capacity).map(vehicle => {
           // Calculate the maximum load across all delivery dates for this vehicle
           const dateGroups = {};
           assignedPOs

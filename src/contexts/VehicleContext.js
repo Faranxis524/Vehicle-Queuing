@@ -274,79 +274,85 @@ export const VehicleProvider = ({ children }) => {
 
     if (eligibleVehicles.length === 0) return [];
 
-    // Enhanced ranking algorithm for optimal load distribution
-    const scored = eligibleVehicles.map(v => {
-      // Get all POs currently assigned to this vehicle
-      const assignedPOs = v.assignedPOs.map(poId => allPOs.find(p => p.id === poId)).filter(Boolean);
-      const currentLoad = assignedPOs.reduce((total, assignedPO) => total + calculateLoad(assignedPO), 0);
-      const remainingCapacity = v.capacity - currentLoad;
-      const utilizationAfter = (currentLoad + load) / v.capacity;
+    // Enhanced ranking algorithm for optimal load distribution, prioritizing smaller vehicles first
+    const scored = eligibleVehicles
+      .sort((a, b) => a.capacity - b.capacity) // Sort by capacity ascending (smallest first)
+      .map(v => {
+        // Get all POs currently assigned to this vehicle
+        const assignedPOs = v.assignedPOs.map(poId => allPOs.find(p => p.id === poId)).filter(Boolean);
+        const currentLoad = assignedPOs.reduce((total, assignedPO) => total + calculateLoad(assignedPO), 0);
+        const remainingCapacity = v.capacity - currentLoad;
+        const utilizationAfter = (currentLoad + load) / v.capacity;
 
-      // Calculate cluster efficiency (prefer vehicles already assigned to same cluster)
-      // Reduce the weight during rebalancing to encourage better distribution
-      const clusterMatches = assignedPOs.reduce((acc, assignedPO) => {
-        return acc + (assignedPO && assignedPO.deliveryDate === po.deliveryDate && findCluster(assignedPO.location) === clusterName ? 1 : 0);
-      }, 0);
+        // Calculate cluster efficiency (prefer vehicles already assigned to same cluster)
+        // Reduce the weight during rebalancing to encourage better distribution
+        const clusterMatches = assignedPOs.reduce((acc, assignedPO) => {
+          return acc + (assignedPO && assignedPO.deliveryDate === po.deliveryDate && findCluster(assignedPO.location) === clusterName ? 1 : 0);
+        }, 0);
 
-      // Calculate load efficiency (prefer vehicles that will be well-utilized but not over-utilized)
-      let loadEfficiency = 0;
-      if (utilizationAfter <= 0.5) {
-        // Under-utilized: bonus for filling up
-        loadEfficiency = 2.5;
-      } else if (utilizationAfter <= 0.75) {
-        // Good range: high priority
-        loadEfficiency = 4;
-      } else if (utilizationAfter <= 0.9) {
-        // Optimal range: highest priority
-        loadEfficiency = 3;
-      } else if (utilizationAfter <= 0.95) {
-        // Near capacity: still good but less optimal
-        loadEfficiency = 1;
-      } else {
-        // Over-utilized: penalty
-        loadEfficiency = -2;
-      }
+        // Calculate load efficiency (prefer vehicles that will be well-utilized but not over-utilized)
+        let loadEfficiency = 0;
+        if (utilizationAfter <= 0.5) {
+          // Under-utilized: bonus for filling up
+          loadEfficiency = 2.5;
+        } else if (utilizationAfter <= 0.75) {
+          // Good range: high priority
+          loadEfficiency = 4;
+        } else if (utilizationAfter <= 0.9) {
+          // Optimal range: highest priority
+          loadEfficiency = 3;
+        } else if (utilizationAfter <= 0.95) {
+          // Near capacity: still good but less optimal
+          loadEfficiency = 1;
+        } else {
+          // Over-utilized: penalty
+          loadEfficiency = -2;
+        }
 
-      // Calculate vehicle size efficiency (prefer appropriately sized vehicles)
-      let sizeEfficiency = 0;
-      const loadRatio = load / v.capacity;
-      if (loadRatio <= 0.2 && v.capacity > 10000000) {
-        // Very small load in large vehicle: penalty
-        sizeEfficiency = -1;
-      } else if (loadRatio <= 0.4 && v.capacity > 5000000) {
-        // Small load in large vehicle: slight penalty
-        sizeEfficiency = -0.5;
-      } else if (loadRatio > 0.9 && v.capacity < 5000000) {
-        // Large load in small vehicle: penalty
-        sizeEfficiency = -1.5;
-      } else if (loadRatio > 0.8 && v.capacity < 10000000) {
-        // Large load in medium vehicle: slight penalty
-        sizeEfficiency = -0.5;
-      }
+        // Calculate vehicle size efficiency (prefer appropriately sized vehicles)
+        let sizeEfficiency = 0;
+        const loadRatio = load / v.capacity;
+        if (loadRatio <= 0.2 && v.capacity > 10000000) {
+          // Very small load in large vehicle: penalty
+          sizeEfficiency = -1;
+        } else if (loadRatio <= 0.4 && v.capacity > 5000000) {
+          // Small load in large vehicle: slight penalty
+          sizeEfficiency = -0.5;
+        } else if (loadRatio > 0.9 && v.capacity < 5000000) {
+          // Large load in small vehicle: penalty
+          sizeEfficiency = -1.5;
+        } else if (loadRatio > 0.8 && v.capacity < 10000000) {
+          // Large load in medium vehicle: slight penalty
+          sizeEfficiency = -0.5;
+        }
 
-      // For rebalancing, reduce cluster preference to encourage distribution across vehicles
-      const clusterWeight = isRebalancing ? 1 : 3; // Reduced from 3 to 1 during rebalancing
+        // For rebalancing, reduce cluster preference to encourage distribution across vehicles
+        const clusterWeight = isRebalancing ? 1 : 3; // Reduced from 3 to 1 during rebalancing
 
-      // Total score combines multiple factors with weighted priorities
-      const totalScore = (clusterMatches * clusterWeight) + loadEfficiency + sizeEfficiency;
+        // Total score combines multiple factors with weighted priorities
+        const totalScore = (clusterMatches * clusterWeight) + loadEfficiency + sizeEfficiency;
 
-      return {
-        vehicle: v,
-        totalScore,
-        utilizationAfter,
-        remainingCapacity,
-        clusterMatches,
-        loadEfficiency,
-        sizeEfficiency
-      };
-    });
+        return {
+          vehicle: v,
+          totalScore,
+          utilizationAfter,
+          remainingCapacity,
+          clusterMatches,
+          loadEfficiency,
+          sizeEfficiency
+        };
+      });
 
-    // Sort by total score (descending), then by utilization after (ascending for better distribution)
+    // Sort by total score (descending), then by capacity (ascending for smaller vehicles), then by utilization
     scored.sort((a, b) => {
       if (Math.abs(b.totalScore - a.totalScore) > 0.1) {
         return b.totalScore - a.totalScore;
       }
-      // If scores are very close, prefer the one with better utilization (closer to optimal range)
+      // If scores are equal, prefer smaller vehicles
+      if (a.vehicle.capacity !== b.vehicle.capacity) {
+        return a.vehicle.capacity - b.vehicle.capacity;
+      }
+      // If capacities are equal, prefer the one with better utilization (closer to optimal range)
       const aUtilDiff = Math.abs(a.utilizationAfter - 0.8); // Optimal around 80%
       const bUtilDiff = Math.abs(b.utilizationAfter - 0.8);
       return aUtilDiff - bUtilDiff;
@@ -547,36 +553,44 @@ export const VehicleProvider = ({ children }) => {
             continue;
           }
           
-          // Select the best vehicle using scoring logic
+          // Select the best vehicle using scoring logic, prioritizing smaller vehicles first
           // Prefer vehicles already serving this cluster/date, then by utilization
-          const scoredVehicles = eligibleVehicles.map(v => {
-            const currentLoad = v.currentLoad || 0;
-            const utilizationAfter = (currentLoad + poLoad) / v.capacity;
-            
-            // Prefer vehicles already serving this cluster/date combination
-            const alreadyServingCluster = v.dateClusterMap?.[deliveryDate] === clusterName ? 10 : 0;
-            
-            // Prefer good utilization (70-90%)
-            let utilizationScore = 0;
-            if (utilizationAfter >= 0.7 && utilizationAfter <= 0.9) {
-              utilizationScore = 5;
-            } else if (utilizationAfter >= 0.5 && utilizationAfter < 0.7) {
-              utilizationScore = 3;
-            } else if (utilizationAfter > 0.9 && utilizationAfter <= 0.95) {
-              utilizationScore = 2;
-            } else if (utilizationAfter < 0.5) {
-              utilizationScore = 1;
+          const scoredVehicles = eligibleVehicles
+            .sort((a, b) => a.capacity - b.capacity) // Sort by capacity ascending (smallest first)
+            .map(v => {
+              const currentLoad = v.currentLoad || 0;
+              const utilizationAfter = (currentLoad + poLoad) / v.capacity;
+
+              // Prefer vehicles already serving this cluster/date combination
+              const alreadyServingCluster = v.dateClusterMap?.[deliveryDate] === clusterName ? 10 : 0;
+
+              // Prefer good utilization (70-90%)
+              let utilizationScore = 0;
+              if (utilizationAfter >= 0.7 && utilizationAfter <= 0.9) {
+                utilizationScore = 5;
+              } else if (utilizationAfter >= 0.5 && utilizationAfter < 0.7) {
+                utilizationScore = 3;
+              } else if (utilizationAfter > 0.9 && utilizationAfter <= 0.95) {
+                utilizationScore = 2;
+              } else if (utilizationAfter < 0.5) {
+                utilizationScore = 1;
+              }
+
+              return {
+                vehicle: v,
+                score: alreadyServingCluster + utilizationScore,
+                utilizationAfter
+              };
+            });
+
+          // Sort by score (highest first), then by capacity (ascending for smaller vehicles)
+          scoredVehicles.sort((a, b) => {
+            if (b.score !== a.score) {
+              return b.score - a.score;
             }
-            
-            return {
-              vehicle: v,
-              score: alreadyServingCluster + utilizationScore,
-              utilizationAfter
-            };
+            // If scores are equal, prefer smaller vehicles
+            return a.vehicle.capacity - b.vehicle.capacity;
           });
-          
-          // Sort by score (highest first)
-          scoredVehicles.sort((a, b) => b.score - a.score);
           
           // Assign to best vehicle
           const bestVehicle = scoredVehicles[0].vehicle;
