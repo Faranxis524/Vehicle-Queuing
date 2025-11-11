@@ -220,6 +220,7 @@ Click on any PO card to view detailed information, edit, or delete the order.
 - **Load Calculation**: Based on product dimensions (cm³)
 - **Capacity**: Maximum load per vehicle
 - **Utilization**: Current load as percentage of capacity
+- **Vehicle Queueing**: Vehicles are displayed and assigned in order of smallest to largest capacity
 - **Color Coding**:
   - Green: Good utilization (≤75%)
   - Orange: High utilization (75-90%)
@@ -251,6 +252,7 @@ The system includes a sophisticated **10-Rule Rebalancing Engine** that optimize
 - **Constraint Satisfaction**: Respects all business rules
 - **Bin Packing**: Efficiently packs orders (largest first)
 - **Multi-Objective**: Balances utilization, route efficiency, and cost
+- **Small Vehicle Priority**: Assigns to smallest suitable vehicles first for better fleet utilization
 
 ### Viewing History
 
@@ -431,7 +433,7 @@ A: The system uses Firebase Firestore for real-time database updates, so changes
 ### Admin Questions
 
 **Q: How are vehicles automatically assigned to POs?**
-A: The system uses advanced linear programming algorithms that consider vehicle capacity, driver availability, delivery location clusters, current load distribution, and multiple optimization factors for optimal assignments. The algorithm scores vehicles based on cluster efficiency, load utilization targets (70-90%), and size appropriateness.
+A: The system uses advanced linear programming algorithms that consider vehicle capacity, driver availability, delivery location clusters, current load distribution, and multiple optimization factors for optimal assignments. The algorithm prioritizes smaller vehicles first, then scores vehicles based on cluster efficiency, load utilization targets (70-90%), and size appropriateness to ensure efficient fleet utilization.
 
 **Q: What are clusters?**
 A: Geographic groupings of delivery locations that help optimize routing and prevent vehicles from serving multiple distant areas on the same day. The system uses a 4-cluster architecture covering North Luzon, Metro Manila North/East, Metro Manila South/Center, and CALABARZON South, implementing linear programming constraints to ensure efficient route optimization.
