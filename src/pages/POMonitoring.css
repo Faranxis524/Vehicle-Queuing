@@ -890,7 +890,7 @@
 .delete-btn {
   background: linear-gradient(180deg, var(--danger), #7F1D1D) !important;
   border: 1px solid rgba(255,255,255,0.18) !important;
-  color: white;
+  color: white !important;
   transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease, border-color 150ms ease !important;
 }
 
