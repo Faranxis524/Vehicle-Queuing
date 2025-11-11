@@ -90,7 +90,7 @@ A comprehensive web-based application built with React for managing Purchase Ord
 ### Development Utilities
 - **Clear Firebase Data**: Run `node clearFirebase.js` to reset the database and initialize sample driver data for testing
 
-## 📱 Usage Guide
+##  Usage Guide
 
 ### For Admin Users:
 1. **Login**: Use admin credentials (username: `admin`, password: `password`)
