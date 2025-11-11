@@ -3,7 +3,7 @@
 
 A comprehensive web-based application built with React for managing Purchase Orders (PO), Vehicle Monitoring, Driver Information, and real-time updates across multiple devices. Features advanced linear programming algorithms for optimal load distribution and constraint-based vehicle assignment.
 
-## 🚀 Key Features
+##  Key Features
 
 ### Core Functionality
 - **PO Monitoring**: Create, view, update, and delete purchase orders with detailed information
@@ -15,14 +15,14 @@ A comprehensive web-based application built with React for managing Purchase Ord
 - **Responsive Design**: Works on desktop and mobile devices
 
 ### Advanced Optimization Features
-- **🤖 Linear Programming Algorithms**: Sophisticated load distribution optimization
-- **📊 Multi-Objective Optimization**: Balances utilization, cost, and efficiency
-- **🎯 Constraint Satisfaction Solver**: Real-time validation of capacity, dimension, and cluster constraints
-- **🔄 10-Rule Rebalancing Engine**: Comprehensive load redistribution with business rule compliance
-- **📍 Geographic Clustering System**: 4-cluster architecture for route optimization
-- **⚡ Real-Time Constraint Validation**: Instant feedback on assignment feasibility
+- ** Linear Programming Algorithms**: Sophisticated load distribution optimization
+- ** Multi-Objective Optimization**: Balances utilization, cost, and efficiency
+- ** Constraint Satisfaction Solver**: Real-time validation of capacity, dimension, and cluster constraints
+- ** 10-Rule Rebalancing Engine**: Comprehensive load redistribution with business rule compliance
+- ** Geographic Clustering System**: 4-cluster architecture for route optimization
+- ** Real-Time Constraint Validation**: Instant feedback on assignment feasibility
 
-## 🛠️ Tech Stack
+##  Tech Stack
 
 ### Frontend & UI
 - **React.js (v19.1.1)** with React Router (v7.9.1) for component-based architecture
@@ -139,7 +139,7 @@ A comprehensive web-based application built with React for managing Purchase Ord
    }
    ```
 
-## 📁 Project Structure
+##  Project Structure
 
 ```
 src/
@@ -185,7 +185,7 @@ REACT_APP_FIREBASE_API_KEY=your_key
 REACT_APP_FIREBASE_PROJECT_ID=your_project
 ```
 
-## 🤝 Contributing
+##  Contributing
 
 We welcome contributions to improve the Vehicle Queuing System! Please follow these guidelines:
 
@@ -220,24 +220,24 @@ We welcome contributions to improve the Vehicle Queuing System! Please follow th
 
 This project is open source and available under the [MIT License](LICENSE).
 
-## 📚 Documentation
+##  Documentation
 
 ### User Documentation
-- **[📖 Complete User Guide](src/documentation/USER_DOCUMENTATION.md)**: Comprehensive tutorial for admins and drivers
+- **[ Complete User Guide](src/documentation/USER_DOCUMENTATION.md)**: Comprehensive tutorial for admins and drivers
 - **Features**: Step-by-step instructions, troubleshooting, and FAQ
 - **Technical Details**: Algorithm explanations and optimization features
 
 ### Technical Documentation
-- **[🔧 Rebalance Implementation](src/documentation/REBALANCE_IMPLEMENTATION.md)**: Detailed algorithm specifications
+- **[ Rebalance Implementation](src/documentation/REBALANCE_IMPLEMENTATION.md)**: Detailed algorithm specifications
 - **10-Rule Framework**: Complete optimization rule documentation
 - **Performance Metrics**: Algorithm complexity and testing recommendations
 
-## 📞 Support & Resources
+##  Support & Resources
 
 ### Getting Help
-- **📖 User Documentation**: Start with the comprehensive user guide
-- **🐛 Issue Reporting**: Open issues on GitHub for bugs and feature requests
-- **💬 Technical Support**: Contact maintainers for implementation questions
+- ** User Documentation**: Start with the comprehensive user guide
+- ** Issue Reporting**: Open issues on GitHub for bugs and feature requests
+- ** Technical Support**: Contact maintainers for implementation questions
 
 ### Key Resources
 - **Algorithm Documentation**: Understanding the optimization engine
@@ -246,7 +246,7 @@ This project is open source and available under the [MIT License](LICENSE).
 
 ---
 
-## ⚠️ Important Notes
+##  Important Notes
 
 ### Development Version
 This is a development/demo version with simplified authentication for testing purposes.
