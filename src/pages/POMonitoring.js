@@ -155,8 +155,8 @@ const CustomDatePicker = ({ value, onChange, min, className }) => {
 
   const isDateDisabled = (date) => {
     if (!min) return false;
-    const minDate = new Date(min);
-    return date < minDate;
+    const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    return dateStr < min;
   };
 
   const isToday = (date) => {
@@ -672,14 +672,10 @@ const POMonitoring = () => {
   const validateDeliveryDate = (deliveryDate, orderDate) => {
     if (!deliveryDate) return { isValid: true, error: '' }; // Will be caught by required field validation
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // Reset time to start of day for date comparison
-
-    const delivery = new Date(deliveryDate);
-    const order = orderDate ? new Date(orderDate) : null;
+    const today = new Date().toISOString().split('T')[0]; // Get today's date as YYYY-MM-DD string
 
     // Check if delivery date is before today
-    if (delivery < today) {
+    if (deliveryDate < today) {
       return {
         isValid: false,
         error: 'Delivery date cannot be in the past'
@@ -687,7 +683,7 @@ const POMonitoring = () => {
     }
 
     // Check if delivery date is before order date
-    if (order && delivery < order) {
+    if (orderDate && deliveryDate < orderDate) {
       return {
         isValid: false,
         error: 'Delivery date cannot be before the order date'
