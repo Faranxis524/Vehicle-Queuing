@@ -160,16 +160,16 @@ After logging in as an admin, you'll see the main dashboard with a sidebar navig
 1. Navigate to **PO Monitoring**
 2. Click the **"+ Add PO"** button (floating action button)
 3. Fill in the order information:
-   - **PO Number**: Unique identifier for the order
-   - **Company Name**: Select from dropdown (Xisco, Sodexo, Jones Lang LaSalle, etc.)
-   - **Location**: Choose delivery location (filtered by company)
-   - **Delivery Date**: Select delivery date (cannot be in the past)
-   - **Order Date**: Date the order was placed
-   - **Address**: Delivery address
-   - **Contact Person**: Person to contact for delivery
-   - **Phone**: Contact phone number (Philippine format)
-   - **Currency**: PHP (default)
-   - **Terms of Payment**: Payment terms
+    - **PO Number**: Unique identifier for the order
+    - **Company Name**: Select from dropdown (Xisco, Sodexo, Jones Lang LaSalle, etc.)
+    - **Location**: Choose delivery location (filtered by company)
+    - **Delivery Date**: Select delivery date (can be same day if order is placed today, or any future date)
+    - **Order Date**: Date the order was placed
+    - **Address**: Delivery address
+    - **Contact Person**: Person to contact for delivery
+    - **Phone**: Contact phone number (Philippine format)
+    - **Currency**: PHP (default)
+    - **Terms of Payment**: Payment terms
 
 4. Add products to the order:
    - Click on product cards to select items
@@ -291,10 +291,10 @@ After logging in, you'll see:
 
 1. In the **"Update Vehicle Status"** section
 2. Select your current status:
-   - **Available**: Ready for deliveries
-   - **In-transit**: Currently delivering
-   - **Unavailable**: Not available for deliveries
-   - **Under Maintenance**: Vehicle under maintenance
+    - **Available**: Ready for deliveries
+    - **In-transit**: Currently delivering (automatically sets assigned PO delivery status to "ongoing")
+    - **Unavailable**: Not available for deliveries
+    - **Under Maintenance**: Vehicle under maintenance
 3. Click **"Update Status"**
 
 **Important**: You cannot change status from "In-transit" until all assigned POs are marked as done.
@@ -327,10 +327,11 @@ After completing a delivery, you can upload photos as proof:
 
 1. **Set Status to Available**: When ready to accept deliveries
 2. **Receive Assignments**: POs are automatically assigned based on location and capacity
-3. **Depart for Delivery**: Update status to "Depart" when leaving
-4. **Update Progress**: Change to "Ongoing" when at delivery location
-5. **Complete Delivery**: Mark as "Done" and upload photos if required
-6. **Return Status**: Change back to "Available" or appropriate status
+3. **Set Status to In-transit**: When starting deliveries (automatically updates all assigned PO delivery status to "ongoing")
+4. **Depart for Delivery**: Update individual PO status to "Depart" when leaving for specific delivery
+5. **Update Progress**: Change to "Ongoing" when at delivery location
+6. **Complete Delivery**: Mark as "Done" and upload photos if required
+7. **Return Status**: Change back to "Available" or appropriate status
 
 ---
 
