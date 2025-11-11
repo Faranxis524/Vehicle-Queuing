@@ -1542,19 +1542,19 @@ const POMonitoring = () => {
               setNotification({
                 type: 'warning',
                 title: 'PO Placed On Hold',
-                message: `No suitable vehicles available in cluster ${clusterName}. All vehicles have drivers with status: ${unavailableDrivers.map(v => `${v.name} (${v.status})`).join(', ')}. Please check driver statuses or wait for drivers to become available. PO has been placed on hold.`
+                message: `No suitable vehicles available in cluster ${clusterName}. All vehicles have drivers with unavailable status: ${unavailableDrivers.map(v => `${v.name} (${v.status})`).join(', ')}. Please update driver statuses to "Available" or wait for drivers to become available. The PO has been placed on hold for now.`
               });
             } else if (availableVehicles.length === 0) {
               setNotification({
                 type: 'warning',
                 title: 'PO Placed On Hold',
-                message: `No suitable vehicles available in cluster ${clusterName} for this PO on the selected delivery date. Vehicles may be full or restricted to another cluster. PO has been placed on hold.`
+                message: `No suitable vehicles available in cluster ${clusterName} for this delivery date. Vehicles may be at capacity or restricted to other geographic clusters. The PO has been placed on hold and will be available for assignment when suitable vehicles become available.`
               });
             } else {
               setNotification({
                 type: 'warning',
                 title: 'PO Placed On Hold',
-                message: 'No suitable vehicle available for this PO. PO has been placed on hold.'
+                message: 'No suitable vehicle is available for this PO at this time. The PO has been placed on hold and will be automatically assigned when a suitable vehicle becomes available.'
               });
             }
 
@@ -1749,7 +1749,7 @@ const POMonitoring = () => {
       setNotification({
         type: 'success',
         title: 'Purchase Order Created',
-        message: `PO ${newPO.customId} has been successfully created and ${newPO.status === 'assigned' ? `assigned to ${newPO.assignedTruck}` : newPO.status === 'on-hold' ? 'placed on hold due to date-based balancing rules' : 'placed on hold pending vehicle assignment'}.`,
+        message: `PO ${newPO.customId} has been successfully created and ${newPO.status === 'assigned' ? `automatically assigned to ${newPO.assignedTruck}` : newPO.status === 'on-hold' ? 'placed on hold due to scheduling rules' : 'placed on hold pending vehicle assignment'}. You can monitor its progress in the PO list.`,
         autoClose: true,
         autoCloseDelay: 5000,
         showCloseButton: false
@@ -1897,7 +1897,7 @@ const POMonitoring = () => {
       setNotification({
         type: 'error',
         title: 'Date Restriction',
-        message: `Cannot assign PO with delivery date ${selectedPO.deliveryDate}. Only current date (${currentDate}) or earliest existing date (${earliestExistingDate}) are allowed.`,
+        message: `Cannot assign this PO because its delivery date (${selectedPO.deliveryDate}) is not allowed. Only POs with today's date (${currentDate}) or the earliest existing delivery date (${earliestExistingDate}) can be assigned to maintain efficient delivery scheduling.`,
         showCloseButton: true
       });
       return;
@@ -1914,7 +1914,7 @@ const POMonitoring = () => {
         setNotification({
           type: 'error',
           title: 'Cluster Conflict',
-          message: `Selected vehicle is already assigned to ${lockedCluster} on ${selectedPO.deliveryDate}. You cannot mix clusters on the same trip.`,
+          message: `Cannot assign this PO to the selected vehicle. The vehicle is already assigned to deliver in ${lockedCluster} on ${selectedPO.deliveryDate}. Each vehicle can only serve one geographic cluster per delivery day to ensure efficient routing.`,
           showCloseButton: true
         });
         return;
@@ -1925,7 +1925,7 @@ const POMonitoring = () => {
         setNotification({
           type: 'error',
           title: 'Invalid Location',
-          message: 'This PO has an invalid location that is not assigned to any cluster. Please update the PO location first.',
+          message: 'This PO has a delivery location that is not assigned to any geographic cluster. Please update the PO location to a valid delivery area before assigning it to a vehicle.',
           showCloseButton: true
         });
         return;
@@ -1937,7 +1937,7 @@ const POMonitoring = () => {
           setNotification({
             type: 'error',
             title: 'Vehicle Unavailable',
-            message: `Cannot assign to ${vehicle.name}: Driver status is "${vehicle.status}". Vehicle is not available for delivery.`,
+            message: `Cannot assign this PO to ${vehicle.name} because the driver status is "${vehicle.status}". Only vehicles with "Available" drivers can be assigned for deliveries.`,
             showCloseButton: true
           });
           return;
@@ -1974,7 +1974,7 @@ const POMonitoring = () => {
         setNotification({
           type: 'error',
           title: 'Insufficient Capacity',
-          message: 'Selected vehicle does not have enough capacity for that delivery date.',
+          message: 'The selected vehicle does not have enough remaining capacity for this PO on the specified delivery date. Consider choosing a different vehicle or reducing the order size.',
           showCloseButton: true
         });
       }
