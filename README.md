@@ -102,6 +102,11 @@ A comprehensive web-based application built with React for managing Purchase Ord
 ### For Driver Users:
 1. **Mobile Login**: Access `http://[IP]:3000/driver-login` on mobile devices
 2. **Authentication**: Enter driver name with password `password`
+   - **Authorized Drivers**:
+     - Fernando Besa
+     - Joseph Allan Saldivar
+     - Randy Maduro
+     - Adrian Silao
 3. **Status Updates**: Update vehicle status (Available, In-transit, Unavailable, Under Maintenance)
 4. **Delivery Tracking**: Mark POs as Depart → Ongoing → Done with photo uploads
 5. **Real-time Sync**: All changes instantly reflect on admin dashboard
