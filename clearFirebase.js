@@ -41,6 +41,7 @@ const clearAll = async () => {
     await clearCollection('pos');
     await clearCollection('history');
     await clearCollection('drivers');
+    await clearCollection('completed-pos');
     // Add other collections if needed
     console.log('All collections cleared.');
     await initializeDrivers();

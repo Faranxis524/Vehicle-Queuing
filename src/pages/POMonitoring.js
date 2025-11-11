@@ -69,7 +69,7 @@ const clusters = {
   },
   'Cluster 3': {
     name: 'Metro Manila South/Center',
-    locations: ['Makati', 'RCBC', 'BGC Taguig', 'Panorama BGC Taguig', 'Bench Taguig', 'Uptown', 'Menarco', 'Milestone', 'MOA', 'Alabang']
+    locations: ['Makati', 'RCBC', 'BGC Taguig', 'Panorama BGC Taguig', 'Bench Taguig', 'Uptown', 'Menarco', 'Milestone', 'MOA']
   },
   'Cluster 4': {
     name: 'CALABARZON (South Luzon)',
