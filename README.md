@@ -1,5 +1,5 @@
-# HILTAC Vehicle Queuing System
-**Advanced Load Optimization & Fleet Management Platform**
+# HILTAC AUTOMATED DELIVERY ALLOCATION SYSTEM
+**Intelligent Delivery Optimization & Fleet Management Platform**
 
 A comprehensive web-based application built with React for managing Purchase Orders (PO), Vehicle Monitoring, Driver Information, and real-time updates across multiple devices. Features advanced linear programming algorithms for optimal load distribution and constraint-based vehicle assignment.
 
@@ -187,7 +187,7 @@ REACT_APP_FIREBASE_PROJECT_ID=your_project
 
 ##  Contributing
 
-We welcome contributions to improve the Vehicle Queuing System! Please follow these guidelines:
+We welcome contributions to improve the HILTAC AUTOMATED DELIVERY ALLOCATION SYSTEM! Please follow these guidelines:
 
 ### Development Setup
 1. **Fork the repository** on GitHub
