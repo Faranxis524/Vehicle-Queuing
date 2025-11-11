@@ -21,6 +21,7 @@ A comprehensive web-based application built with React for managing Purchase Ord
 - ** 10-Rule Rebalancing Engine**: Comprehensive load redistribution with business rule compliance
 - ** Geographic Clustering System**: 4-cluster architecture for route optimization
 - ** Real-Time Constraint Validation**: Instant feedback on assignment feasibility
+- ** Forecasting System**: Predictive analytics for delivery planning and resource allocation
 
 ##  Tech Stack
 
@@ -31,7 +32,6 @@ A comprehensive web-based application built with React for managing Purchase Ord
 
 ### Backend & Database
 - **Firebase Firestore (v12.3.0)** (NoSQL database) for real-time data synchronization
-- **Firebase Storage** for delivery photo uploads
 - **Firebase Authentication** for secure user management
 
 ### Advanced Algorithms & Optimization
@@ -108,7 +108,7 @@ A comprehensive web-based application built with React for managing Purchase Ord
      - Randy Maduro
      - Adrian Silao
 3. **Status Updates**: Update vehicle status (Available, In-transit, Unavailable, Under Maintenance)
-4. **Delivery Tracking**: Mark POs as Depart → Ongoing → Done with photo uploads
+4. **Delivery Tracking**: Mark POs as Depart → Ongoing → Done
 5. **Real-time Sync**: All changes instantly reflect on admin dashboard
 
 ### Advanced Features:
