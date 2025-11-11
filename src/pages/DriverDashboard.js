@@ -208,20 +208,55 @@ const DriverDashboard = () => {
     });
   };
 
-  const handleStatusUpdate = async () => {
-    // Check if trying to change from In-transit status
-    if (loggedInDriver.status === 'In-transit' && status !== 'In-transit') {
-      const assignedPOs = pos.filter(po => po.assignedDriver === loggedInDriver.name || po.assignedTruck === loggedInDriver.vehicle);
-      const allDone = assignedPOs.every(po => po.deliveryStatus === 'done');
-      if (!allDone) {
-        setNotification({
-          type: 'error',
-          title: 'Cannot Change Status',
-          message: 'You cannot change your status from In-transit until all assigned POs are marked as done.'
-        });
-        setUpdatingStatus(false);
-        return;
+  const validateStatusTransition = (currentStatus, newStatus) => {
+    const assignedPOs = pos.filter(po => po.assignedDriver === loggedInDriver.name || po.assignedTruck === loggedInDriver.vehicle);
+    const pendingDeliveries = assignedPOs.filter(po => po.deliveryStatus !== 'done' && po.status !== 'delivered');
+
+    // Rule 1: Cannot change from In-transit unless all active deliveries are done
+    if (currentStatus === 'In-transit' && newStatus !== 'In-transit') {
+      const allActiveDone = assignedPOs.every(po => po.deliveryStatus === 'done' || po.status === 'delivered');
+      if (!allActiveDone) {
+        const activeCount = assignedPOs.filter(po => po.deliveryStatus !== 'done' && po.status !== 'delivered').length;
+        return {
+          valid: false,
+          reason: `Cannot change status from In-transit until all ${activeCount} active delivery(ies) are marked as done.`,
+          suggestion: 'Complete all deliveries first or contact supervisor for assistance.'
+        };
       }
+    }
+
+    // Rule 2: Cannot go unavailable/maintenance if there are active deliveries
+    if ((newStatus === 'Unavailable' || newStatus === 'Under Maintenance') && pendingDeliveries.length > 0) {
+      return {
+        valid: false,
+        reason: `Cannot set status to ${newStatus} while having ${pendingDeliveries.length} pending delivery(ies).`,
+        suggestion: 'Complete all deliveries or reassign them before changing status.'
+      };
+    }
+
+    // Rule 3: Cannot go in-transit without pending deliveries to complete
+    if (newStatus === 'In-transit' && pendingDeliveries.length === 0) {
+      return {
+        valid: false,
+        reason: 'Cannot set status to In-transit - no pending deliveries to complete.',
+        suggestion: 'Wait for new POs to be assigned or ensure you have deliveries that need completion.'
+      };
+    }
+
+    return { valid: true };
+  };
+
+  const handleStatusUpdate = async () => {
+    // Validate status transition
+    const validation = validateStatusTransition(loggedInDriver.status, status);
+    if (!validation.valid) {
+      setNotification({
+        type: 'error',
+        title: 'Status Change Not Allowed',
+        message: `${validation.reason}\n\n${validation.suggestion}`
+      });
+      setUpdatingStatus(false);
+      return;
     }
 
     setUpdatingStatus(true);
@@ -273,16 +308,16 @@ const DriverDashboard = () => {
           }
         }
       } else if (status === 'In-transit') {
-        // When driver goes in-transit, set all assigned POs to in-transit status
+        // When driver goes in-transit, set all assigned POs to in-transit status and deliveryStatus to ongoing
         const vehicle = vehicles.find(v => v.name === loggedInDriver.vehicle);
         if (vehicle) {
-          const assignedPOs = pos.filter(po => po.assignedTruck === loggedInDriver.vehicle && po.status === 'assigned');
+          const assignedPOs = pos.filter(po => po.assignedTruck === loggedInDriver.vehicle && po.deliveryStatus !== 'done');
           for (const po of assignedPOs) {
-            await updateDoc(doc(db, 'pos', po.id), { status: 'in-transit' });
+            await updateDoc(doc(db, 'pos', po.id), { status: 'in-transit', deliveryStatus: 'ongoing' });
             await addDoc(collection(db, 'history'), {
               timestamp: new Date(),
               action: 'PO Status Auto-Updated',
-              details: `PO ${po.customId} status changed to in-transit - driver ${loggedInDriver.name} started delivery`
+              details: `PO ${po.customId} status changed to in-transit and delivery status to ongoing - driver ${loggedInDriver.name} started delivery`
             });
           }
         }
@@ -302,18 +337,22 @@ const DriverDashboard = () => {
         }
       }
 
-      // Log to history
+      // Enhanced audit trail logging
       await addDoc(collection(db, 'history'), {
         timestamp: new Date(),
-        action: 'Status Updated',
-        details: `Driver ${loggedInDriver.name} set status to ${status}, vehicle ${loggedInDriver.vehicle} ready: ${vehicleReady}`
+        action: 'Driver Status Updated',
+        details: `Driver ${loggedInDriver.name} changed status from '${loggedInDriver.status}' to '${status}'. Vehicle ${loggedInDriver.vehicle} ready status: ${vehicleReady}`,
+        previousStatus: loggedInDriver.status,
+        newStatus: status,
+        vehicle: loggedInDriver.vehicle,
+        assignedPOCount: pos.filter(po => po.assignedDriver === loggedInDriver.name || po.assignedTruck === loggedInDriver.vehicle).length
       });
 
-      // Show success feedback
+      // Show success feedback with more context
       setNotification({
         type: 'success',
         title: 'Status Updated',
-        message: `Status updated to ${status} successfully!`,
+        message: `Status successfully updated to ${status}! ${status === 'In-transit' ? 'Safe travels!' : ''}`,
         autoClose: true,
         autoCloseDelay: 3000,
         showCloseButton: false
@@ -323,7 +362,7 @@ const DriverDashboard = () => {
       setNotification({
         type: 'error',
         title: 'Update Failed',
-        message: 'Failed to update status. Please try again.'
+        message: 'Failed to update status. Please check your connection and try again. If the problem persists, contact support.'
       });
     } finally {
       setUpdatingStatus(false);
@@ -335,34 +374,173 @@ const DriverDashboard = () => {
     window.location.href = '/login';
   };
 
-  const updateDeliveryStatus = async (poId, newStatus) => {
-    const po = pos.find(p => p.id === poId);
-    if (newStatus === 'done') {
-      // Change status to 'delivered' for admin confirmation instead of moving to history immediately
-      await updateDoc(doc(db, 'pos', poId), { status: 'delivered', deliveryStatus: newStatus });
-    } else {
-      await updateDoc(doc(db, 'pos', poId), { deliveryStatus: newStatus });
+  const validateDeliveryStatusUpdate = (po, newStatus) => {
+    // Rule 1: Can only mark as done when driver status is In-transit
+    if (newStatus === 'done' && loggedInDriver.status !== 'In-transit') {
+      return {
+        valid: false,
+        reason: 'You can only mark POs as done when your status is In-transit.',
+        suggestion: 'Change your status to In-transit first, then mark deliveries as complete.'
+      };
     }
 
-    await addDoc(collection(db, 'history'), {
-      timestamp: new Date(),
-      action: newStatus === 'done' ? 'PO Marked as Delivered (Awaiting Admin Confirmation)' : 'Updated Delivery Status',
-      details: `PO ${po.customId} status updated to ${newStatus} by ${loggedInDriver.name}`
-    });
+    // Rule 2: Cannot mark as done if not at least 'ongoing' status
+    if (newStatus === 'done' && po.deliveryStatus !== 'ongoing') {
+      return {
+        valid: false,
+        reason: 'PO must be in ongoing status before marking as done.',
+        suggestion: 'Update status to ongoing first, then complete the delivery.'
+      };
+    }
+
+    // Rule 3: Logical progression validation
+    const statusOrder = ['pending', 'departure', 'ongoing', 'done'];
+    const currentIndex = statusOrder.indexOf(po.deliveryStatus);
+    const newIndex = statusOrder.indexOf(newStatus);
+
+    if (newIndex < currentIndex && newStatus !== 'done') {
+      return {
+        valid: false,
+        reason: 'Cannot revert delivery status to an earlier stage.',
+        suggestion: 'Delivery status can only progress forward or be marked as done.'
+      };
+    }
+
+    return { valid: true };
+  };
+
+  const updateDeliveryStatus = async (poId, newStatus) => {
+    const po = pos.find(p => p.id === poId);
+
+    // Validate delivery status update
+    const validation = validateDeliveryStatusUpdate(po, newStatus);
+    if (!validation.valid) {
+      setNotification({
+        type: 'error',
+        title: 'Cannot Update Delivery Status',
+        message: `${validation.reason}\n\n${validation.suggestion}`
+      });
+      return;
+    }
+
+    try {
+      if (newStatus === 'done') {
+        // Change status to 'delivered' for admin confirmation instead of moving to history immediately
+        await updateDoc(doc(db, 'pos', poId), { status: 'delivered', deliveryStatus: newStatus });
+      } else {
+        await updateDoc(doc(db, 'pos', poId), { deliveryStatus: newStatus });
+      }
+
+      // Enhanced audit trail with more context
+      await addDoc(collection(db, 'history'), {
+        timestamp: new Date(),
+        action: newStatus === 'done' ? 'PO Marked as Delivered (Awaiting Admin Confirmation)' : 'Delivery Status Updated',
+        details: `PO ${po.customId} delivery status changed from '${po.deliveryStatus}' to '${newStatus}' by driver ${loggedInDriver.name}`,
+        poId: poId,
+        driver: loggedInDriver.name,
+        vehicle: loggedInDriver.vehicle,
+        location: po.location,
+        previousStatus: po.deliveryStatus,
+        newStatus: newStatus,
+        hasPhoto: !!po.deliveryPhoto
+      });
+
+      // Success feedback
+      setNotification({
+        type: 'success',
+        title: 'Delivery Status Updated',
+        message: `PO ${po.customId} status updated to ${newStatus} successfully!`,
+        autoClose: true,
+        autoCloseDelay: 2000,
+        showCloseButton: false
+      });
+    } catch (error) {
+      console.error('Delivery status update failed:', error);
+      setNotification({
+        type: 'error',
+        title: 'Update Failed',
+        message: 'Failed to update delivery status. Please check your connection and try again.'
+      });
+    }
   };
 
   const handlePhotoUpload = async (e, poId) => {
     const file = e.target.files[0];
-    if (file) {
+    if (!file) return;
+
+    // Validate file type and size
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+    const maxSize = 10 * 1024 * 1024; // 10MB
+
+    if (!allowedTypes.includes(file.type)) {
+      setNotification({
+        type: 'error',
+        title: 'Invalid File Type',
+        message: 'Please upload only image files (JPEG, PNG, GIF).'
+      });
+      return;
+    }
+
+    if (file.size > maxSize) {
+      setNotification({
+        type: 'error',
+        title: 'File Too Large',
+        message: 'Please upload images smaller than 10MB.'
+      });
+      return;
+    }
+
+    try {
+      const po = pos.find(p => p.id === poId);
       const storage = getStorage();
-      const storageRef = ref(storage, `delivery-photos/${poId}/${file.name}`);
+      const timestamp = new Date().getTime();
+      const fileName = `${timestamp}_${file.name}`;
+      const storageRef = ref(storage, `delivery-photos/${poId}/${fileName}`);
+
+      // Upload with progress feedback
+      setNotification({
+        type: 'info',
+        title: 'Uploading Photo',
+        message: 'Please wait while the photo uploads...',
+        showCloseButton: false
+      });
+
       await uploadBytes(storageRef, file);
       const downloadURL = await getDownloadURL(storageRef);
-      await updateDoc(doc(db, 'pos', poId), { deliveryPhoto: downloadURL });
+
+      await updateDoc(doc(db, 'pos', poId), {
+        deliveryPhoto: downloadURL,
+        photoUploadedAt: new Date(),
+        photoUploadedBy: loggedInDriver.name
+      });
+
+      // Enhanced audit trail
       await addDoc(collection(db, 'history'), {
         timestamp: new Date(),
-        action: 'Uploaded Delivery Photo',
-        details: `Photo uploaded for PO ${pos.find(p => p.id === poId).customId} by ${loggedInDriver.name}`
+        action: 'Delivery Photo Uploaded',
+        details: `Photo uploaded for PO ${po.customId} by driver ${loggedInDriver.name}`,
+        poId: poId,
+        driver: loggedInDriver.name,
+        vehicle: loggedInDriver.vehicle,
+        fileName: fileName,
+        fileSize: file.size,
+        fileType: file.type
+      });
+
+      setNotification({
+        type: 'success',
+        title: 'Photo Uploaded',
+        message: 'Delivery photo uploaded successfully!',
+        autoClose: true,
+        autoCloseDelay: 2000,
+        showCloseButton: false
+      });
+    } catch (error) {
+      console.error('Photo upload failed:', error);
+      setNotification({
+        type: 'error',
+        title: 'Upload Failed',
+        message: 'Failed to upload photo. Please check your connection and try again.'
       });
     }
   };
@@ -546,17 +724,19 @@ const DriverDashboard = () => {
                             e.stopPropagation();
                             const nextStatus = po.deliveryStatus === 'pending' ? 'departure' : po.deliveryStatus === 'departure' ? 'ongoing' : 'done';
                             if (nextStatus === 'done') {
-                              if (loggedInDriver.status !== 'In-transit') {
+                              // Enhanced validation for marking as done
+                              const validation = validateDeliveryStatusUpdate(po, nextStatus);
+                              if (!validation.valid) {
                                 setNotification({
-                                  type: 'warning',
-                                  title: 'Cannot Mark as Done',
-                                  message: 'You can only mark POs as done when your status is In-transit.'
+                                  type: 'error',
+                                  title: 'Cannot Complete Delivery',
+                                  message: `${validation.reason}\n\n${validation.suggestion}`
                                 });
                                 return;
                               }
                               setConfirmDialog({
-                                title: 'Mark PO as Done',
-                                message: 'Warning: Marking this PO as done cannot be undone and will move it to History. Continue?',
+                                title: 'Complete Delivery',
+                                message: `Are you sure you want to mark PO ${po.customId} as completed? This action cannot be undone and will require admin confirmation.`,
                                 type: 'warning',
                                 onConfirm: () => updateDeliveryStatus(po.id, nextStatus)
                               });

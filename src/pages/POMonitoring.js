@@ -256,6 +256,7 @@ const POMonitoring = () => {
     termsOfPayment: '',
     status: 'pending'
   });
+  const [deliveryMinDate, setDeliveryMinDate] = useState(new Date().toISOString().split('T')[0]);
   const [phoneError, setPhoneError] = useState('');
   const [deliveryDateError, setDeliveryDateError] = useState('');
   const [showForm, setShowForm] = useState(false);
@@ -688,6 +689,20 @@ const POMonitoring = () => {
 
     return { isValid: true, error: '' };
   };
+
+  // Update delivery min date when order date changes
+  useEffect(() => {
+    if (form.poDate) {
+      const orderDate = new Date(form.poDate);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      // Allow same day delivery if order is placed today
+      const minDate = orderDate >= today ? form.poDate : today.toISOString().split('T')[0];
+      setDeliveryMinDate(minDate);
+    } else {
+      setDeliveryMinDate(new Date().toISOString().split('T')[0]);
+    }
+  }, [form.poDate]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -2015,7 +2030,7 @@ const POMonitoring = () => {
                     <CustomDatePicker
                       value={form.deliveryDate}
                       onChange={(e) => handleInputChange({ target: { name: 'deliveryDate', value: e.target.value } })}
-                      min={new Date().toISOString().split('T')[0]}
+                      min={deliveryMinDate}
                       className={deliveryDateError ? 'error' : ''}
                     />
                     {deliveryDateError && <span className="error-message">{deliveryDateError}</span>}
