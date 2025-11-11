@@ -25,12 +25,12 @@ A comprehensive web-based application built with React for managing Purchase Ord
 ## 🛠️ Tech Stack
 
 ### Frontend & UI
-- **React.js** with React Router for component-based architecture
+- **React.js (v19.1.1)** with React Router (v7.9.1) for component-based architecture
 - **CSS3** with modern responsive design and CSS Grid/Flexbox
 - **Material Design** inspired UI components with custom theming
 
 ### Backend & Database
-- **Firebase Firestore** (NoSQL database) for real-time data synchronization
+- **Firebase Firestore (v12.3.0)** (NoSQL database) for real-time data synchronization
 - **Firebase Storage** for delivery photo uploads
 - **Firebase Authentication** for secure user management
 
@@ -54,7 +54,7 @@ A comprehensive web-based application built with React for managing Purchase Ord
 
 ##  Prerequisites
 
-- Node.js (v14 or higher)
+- Node.js (v18.17 or higher)
 - npm or yarn
 - Firebase account (for database)
 
@@ -86,6 +86,9 @@ A comprehensive web-based application built with React for managing Purchase Ord
    - Admin Dashboard: `http://localhost:3000`
    - Driver Login: `http://localhost:3000/driver-login`
    - Network Access: `http://[YOUR_IP]:3000` (for mobile testing)
+
+### Development Utilities
+- **Clear Firebase Data**: Run `node clearFirebase.js` to reset the database and initialize sample driver data for testing
 
 ## 📱 Usage Guide
 
@@ -165,6 +168,7 @@ src/
 ├── firebase.js                   # Firebase configuration and setup
 ├── App.js/css                    # Main application component with routing
 └── index.js                      # Application entry point
+clearFirebase.js                  # Development utility to clear and initialize Firebase data
 ```
 
 ##  Deployment
@@ -259,4 +263,3 @@ This is a development/demo version with simplified authentication for testing pu
 - **Constraint Validation**: Ensures business rule compliance across all operations
 
 ---
-
