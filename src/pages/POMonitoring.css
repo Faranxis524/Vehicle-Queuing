@@ -457,9 +457,12 @@
   border: var(--border);
   border-radius: 12px;
   padding: 20px;
-  display: column;
+  display: flex;
+  flex-direction: column;
   justify-content: space-between;
   transition: box-shadow 0.2s, border-color 0.2s;
+  min-height: 200px;
+  box-sizing: border-box;
 }
 
 .product-card:hover {
@@ -499,6 +502,41 @@
   align-items: center;
   gap: 8px;
   width: 100%;
+  flex-wrap: wrap;
+}
+
+.price-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 120px;
+  flex: 1;
+}
+
+.price-input-group label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.price-input-group input {
+  padding: 6px 8px;
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 4px;
+  font-size: 12px;
+  background: rgba(0,0,0,0.05);
+  color: var(--text);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.price-input-group input:focus {
+  outline: none;
+  border-color: rgba(255,255,255,0.4);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
 }
 
 .pricing-btn {
@@ -1556,4 +1594,74 @@
 
 [data-theme='light'] .calendar-day.disabled {
   color: #d1d5db;
+}
+
+/* Checkbox group styling */
+.checkbox-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.checkbox-group label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"]:checked {
+  accent-color: #16a34a;
+}
+
+.checkbox-text {
+  flex: 1;
+  margin-left: 8px;
+}
+
+.tax-toggles {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tax-toggles .checkbox-group {
+  margin-bottom: 0;
+}
+
+.tax-status {
+  font-weight: 600;
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-left: 8px;
+}
+
+.tax-status.enabled {
+  background-color: rgba(34, 197, 94, 0.1);
+  color: #16a34a;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.tax-status.disabled {
+  background-color: rgba(239, 68, 68, 0.1);
+  color: #dc2626;
+  border: 1px solid rgba(239, 68, 68, 0.3);
 }

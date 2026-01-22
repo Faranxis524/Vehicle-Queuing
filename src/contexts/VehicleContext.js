@@ -57,33 +57,11 @@ const initialVehicles = [
   }
 ];
 
-// Helper function to find cluster for a location
-const findCluster = (location) => {
-  const clusters = {
-    'Cluster 1': {
-      name: 'North Luzon',
-      locations: ['Pampanga', 'Entech Pampanga', 'Bulacan']
-    },
-    'Cluster 2': {
-      name: 'Metro Manila North/East',
-      locations: ['Quezon City', 'Bridgetown Quezon City', 'Binondo', 'Mega Town']
-    },
-    'Cluster 3': {
-      name: 'Metro Manila South/Center',
-      locations: ['Makati', 'RCBC', 'BGC Taguig', 'Panorama BGC Taguig', 'Bench Taguig', 'Uptown', 'Menarco', 'Milestone', 'MOA', 'Alabang']
-    },
-    'Cluster 4': {
-      name: 'CALABARZON (South Luzon)',
-      locations: ['Alabang', 'Calamba', 'Lipa']
-    }
-  };
-
-  for (const [clusterName, cluster] of Object.entries(clusters)) {
-    if (cluster.locations.includes(location)) {
-      return clusterName;
-    }
-  }
-  return null;
+const clusters = {
+  'Cluster 1': { name: 'Cluster 1' },
+  'Cluster 2': { name: 'Cluster 2' },
+  'Cluster 3': { name: 'Cluster 3' },
+  'Cluster 4': { name: 'Cluster 4' }
 };
 
 // Helper function to calculate load from PO products
@@ -213,19 +191,14 @@ export const VehicleProvider = ({ children }) => {
   // Optimized vehicle scoring function for better load distribution
   const scoreVehiclesForPO = (po, vehicles, allPOs, isRebalancing = false) => {
     const load = calculateLoad(po);
-    const clusterName = findCluster(po.location);
 
-    // If location is not in any defined cluster, no vehicles are eligible
-    if (!clusterName) {
-      return [];
-    }
-
-    // Filter by availability, capacity for the PO's date, cluster lock per date, and driver status
+    // Filter by availability, capacity for the PO's date, and driver status
+    // Since clusters are no longer geographic restrictions, only consider capacity, dimensions, and dates
     const eligibleVehicles = vehicles.filter(v => {
       // Check driver availability
       if (v.status !== 'Available') return false;
 
-      // Rule 5: Dimension Compliance - check if PO dimensions fit in vehicle
+      // Dimension Compliance - check if PO dimensions fit in vehicle
       if (!checkDimensionsFit(po, v)) {
         return false;
       }
@@ -238,7 +211,7 @@ export const VehicleProvider = ({ children }) => {
         return load <= v.capacity;
       }
 
-      // Rule 5: No Cross-Date Mixing - vehicle cannot have POs from multiple delivery dates
+      // No Cross-Date Mixing - vehicle cannot have POs from multiple delivery dates
       const vehicleDeliveryDate = assignedPOs[0].deliveryDate;
       const hasMultipleDates = assignedPOs.some(assignedPO => assignedPO.deliveryDate !== vehicleDeliveryDate);
 
@@ -247,27 +220,12 @@ export const VehicleProvider = ({ children }) => {
         return false;
       }
 
-      // Rule 4: Strict Delivery Date Consistency - if delivery dates don't match, cannot assign
-      // EVEN IF SAME CLUSTER - delivery dates must be identical
+      // Delivery Date Consistency - delivery dates must match
       if (po.deliveryDate !== vehicleDeliveryDate) {
         return false;
       }
 
-      // Rule 2: Cluster Matching - all POs in vehicle must be from same cluster
-      const vehicleCluster = findCluster(assignedPOs[0].location);
-      const clusterMismatch = assignedPOs.some(assignedPO => findCluster(assignedPO.location) !== vehicleCluster);
-
-      if (clusterMismatch) {
-        // This shouldn't happen with proper implementation, but safety check
-        return false;
-      }
-
-      // Rule 2: New PO must match the vehicle's cluster
-      if (clusterName !== vehicleCluster) {
-        return false;
-      }
-
-      // Rule 3: Capacity Restriction - check if adding this PO would exceed capacity
+      // Capacity Restriction - check if adding this PO would exceed capacity
       const currentLoad = assignedPOs.reduce((total, assignedPO) => total + calculateLoad(assignedPO), 0);
       return (currentLoad + load) <= v.capacity;
     });
@@ -283,12 +241,6 @@ export const VehicleProvider = ({ children }) => {
         const currentLoad = assignedPOs.reduce((total, assignedPO) => total + calculateLoad(assignedPO), 0);
         const remainingCapacity = v.capacity - currentLoad;
         const utilizationAfter = (currentLoad + load) / v.capacity;
-
-        // Calculate cluster efficiency (prefer vehicles already assigned to same cluster)
-        // Reduce the weight during rebalancing to encourage better distribution
-        const clusterMatches = assignedPOs.reduce((acc, assignedPO) => {
-          return acc + (assignedPO && assignedPO.deliveryDate === po.deliveryDate && findCluster(assignedPO.location) === clusterName ? 1 : 0);
-        }, 0);
 
         // Calculate load efficiency (prefer vehicles that will be well-utilized but not over-utilized)
         let loadEfficiency = 0;
@@ -326,18 +278,14 @@ export const VehicleProvider = ({ children }) => {
           sizeEfficiency = -0.5;
         }
 
-        // For rebalancing, reduce cluster preference to encourage distribution across vehicles
-        const clusterWeight = isRebalancing ? 1 : 3; // Reduced from 3 to 1 during rebalancing
-
-        // Total score combines multiple factors with weighted priorities
-        const totalScore = (clusterMatches * clusterWeight) + loadEfficiency + sizeEfficiency;
+        // Total score combines load and size efficiency (no cluster restrictions)
+        const totalScore = loadEfficiency + sizeEfficiency;
 
         return {
           vehicle: v,
           totalScore,
           utilizationAfter,
           remainingCapacity,
-          clusterMatches,
           loadEfficiency,
           sizeEfficiency
         };
@@ -372,10 +320,9 @@ export const VehicleProvider = ({ children }) => {
 
     console.log(`Auto-assigning PO ${po.customId} to ${chosen.name}:`, {
       load,
-      cluster: findCluster(po.location),
+      cluster: po.cluster,
       score: scoredVehicles[0].totalScore,
-      utilizationAfter: (scoredVehicles[0].utilizationAfter * 100).toFixed(1) + '%',
-      clusterMatches: scoredVehicles[0].clusterMatches
+      utilizationAfter: (scoredVehicles[0].utilizationAfter * 100).toFixed(1) + '%'
     });
 
     // Track assignment centrally. We don't flip global ready here; availability is per-date now.
@@ -463,15 +410,18 @@ export const VehicleProvider = ({ children }) => {
       // Group by cluster for this delivery date
       const posByCluster = {};
       datePOs.forEach(po => {
-        const cluster = findCluster(po.location);
+        const cluster = po.cluster;
         if (cluster) {
           if (!posByCluster[cluster]) {
             posByCluster[cluster] = [];
           }
           posByCluster[cluster].push(po);
         } else {
-          // Location not in any cluster - mark as error
-          errorPOs.push({ po, reason: 'Location not assigned to any cluster' });
+          // PO not assigned to any cluster - assign to default cluster
+          if (!posByCluster['Cluster 1']) {
+            posByCluster['Cluster 1'] = [];
+          }
+          posByCluster['Cluster 1'].push(po);
         }
       });
       
@@ -636,7 +586,7 @@ export const VehicleProvider = ({ children }) => {
       }
       
       // Validate: All POs must be from same cluster
-      const uniqueClusters = [...new Set(vehiclePOs.map(po => findCluster(po.location)).filter(Boolean))];
+      const uniqueClusters = [...new Set(vehiclePOs.map(po => po.cluster).filter(Boolean))];
       if (uniqueClusters.length > 1) {
         validationErrors.push(`Vehicle ${vehicle.name} has mixed clusters: ${uniqueClusters.join(', ')}`);
       }

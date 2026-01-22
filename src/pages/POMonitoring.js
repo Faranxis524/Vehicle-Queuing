@@ -48,47 +48,14 @@ const products = {
   }
 };
 
-const customers = {
-  'Xisco': ['Pampanga', 'Bulacan', 'BGC Taguig', 'Quezon City', 'Makati', 'Alabang', 'Calamba', 'Lipa'],
-  'Sodexo': ['Bulacan', 'BGC Taguig', 'Quezon City', 'Makati', 'Alabang', 'Calamba', 'Lipa'],
-  'Jones Lang LaSalle': ['BGC Taguig', 'Quezon City', 'Makati', 'Alabang', 'Calamba', 'Lipa'],
-  'WeWork': ['Uptown', 'RCBC', 'Menarco', 'Milestone'],
-  'China Bank': ['Makati', 'Binondo', 'Mega Town'],
-  'Tata Consultancy Services Philippines Inc.': ['Bench Taguig', 'Entech Pampanga', 'Panorama BGC Taguig'],
-  'VXI Global Holdings  B. V. Philippines': ['Entech Pampanga', 'Bridgetown Quezon City', 'Makati', 'MOA', 'Panorama BGC Taguig']
-};
-
 const clusters = {
-  'Cluster 1': {
-    name: 'North Luzon',
-    locations: ['Pampanga', 'Entech Pampanga', 'Bulacan']
-  },
-  'Cluster 2': {
-    name: 'Metro Manila North/East',
-    locations: ['Quezon City', 'Bridgetown Quezon City', 'Binondo', 'Mega Town']
-  },
-  'Cluster 3': {
-    name: 'Metro Manila South/Center',
-    locations: ['Makati', 'RCBC', 'BGC Taguig', 'Panorama BGC Taguig', 'Bench Taguig', 'Uptown', 'Menarco', 'Milestone', 'MOA']
-  },
-  'Cluster 4': {
-    name: 'CALABARZON (South Luzon)',
-    locations: ['Alabang', 'Calamba', 'Lipa']
-  }
+  'Cluster 1': { name: 'Cluster 1' },
+  'Cluster 2': { name: 'Cluster 2' },
+  'Cluster 3': { name: 'Cluster 3' },
+  'Cluster 4': { name: 'Cluster 4' }
 };
 
-const allLocations = Object.values(clusters).flatMap(cluster => cluster.locations);
-
-// Get all unique locations from customers
-const allCustomerLocations = [...new Set(Object.values(customers).flatMap(locations => locations))];
-
-// Verify all customer locations are in clusters
-const missingLocations = allCustomerLocations.filter(loc => !allLocations.includes(loc));
-if (missingLocations.length > 0) {
-  console.warn('Warning: The following customer locations are not assigned to any cluster:', missingLocations);
-}
-
-
+const allLocations = [];
 
 // Custom Date Picker Component
 const CustomDatePicker = ({ value, onChange, min, className }) => {
@@ -244,7 +211,7 @@ const POMonitoring = () => {
     poNumber: '',
     companyName: '',
     poDate: '',
-    location: '',
+    cluster: '',
     deliveryDate: '',
     products: [],
     totalPrice: 0,
@@ -254,8 +221,11 @@ const POMonitoring = () => {
     phone: '',
     currency: 'PHP',
     termsOfPayment: '',
+    includeTax: true,
+    includeEwt: false,
     status: 'pending'
   });
+  const [customPrices, setCustomPrices] = useState({});
   const [deliveryMinDate, setDeliveryMinDate] = useState(new Date().toISOString().split('T')[0]);
   const [phoneError, setPhoneError] = useState('');
   const [deliveryDateError, setDeliveryDateError] = useState('');
@@ -270,7 +240,7 @@ const POMonitoring = () => {
     poNumber: '',
     companyName: '',
     poDate: '',
-    location: '',
+    cluster: '',
     deliveryDate: '',
     products: [],
     totalPrice: 0,
@@ -383,40 +353,40 @@ const POMonitoring = () => {
         return total + (item.quantity * itemSize);
       }, 0);
 
-      // Find cluster for this PO
-      const poCluster = findCluster(po.location);
+      // Get cluster for this PO
+      const poCluster = po.cluster;
 
-      // If location is not in any defined cluster, skip this PO (would go on hold in real assignment)
+      // If PO has no cluster assigned, skip this PO (would go on hold in real assignment)
       if (!poCluster) {
-        console.log(`PO ${po.customId} skipped in forecasting - location ${po.location} not in any cluster`);
+        console.log(`PO ${po.customId} skipped in forecasting - no cluster assigned`);
         continue;
       }
 
-      // Check clustering rule: vehicles can only serve one cluster per delivery date
-      // Find available vehicles that either have no cluster assigned for this date, or match the PO's cluster
-      const availableVehicles = simulationVehicles
-        .filter(vehicle => {
-          // Must have capacity
-          if (vehicle.capacity < vehicle.simulatedLoad + load) return false;
+          // Check clustering rule: vehicles can only serve one cluster per delivery date
+          // Find available vehicles that either have no cluster assigned for this date, or match the PO's cluster
+          const availableVehicles = simulationVehicles
+            .filter(vehicle => {
+              // Must have capacity
+              if (vehicle.capacity < vehicle.simulatedLoad + load) return false;
 
-          // Check cluster constraint: vehicle can only serve one cluster per date
-          const vehicleClustersForDate = new Set();
-          vehicle.simulatedPOs.forEach(assignedPO => {
-            if (assignedPO.deliveryDate === selectedDate) {
-              const assignedCluster = findCluster(assignedPO.location);
-              if (assignedCluster) vehicleClustersForDate.add(assignedCluster);
-            }
-          });
+              // Check cluster constraint: vehicle can only serve one cluster per date
+              const vehicleClustersForDate = new Set();
+              vehicle.simulatedPOs.forEach(assignedPO => {
+                if (assignedPO.deliveryDate === selectedDate) {
+                  const assignedCluster = assignedPO.cluster;
+                  if (assignedCluster) vehicleClustersForDate.add(assignedCluster);
+                }
+              });
 
-          // If vehicle has no POs for this date, it's available for any cluster
-          if (vehicleClustersForDate.size === 0) return true;
+              // If vehicle has no POs for this date, it's available for any cluster
+              if (vehicleClustersForDate.size === 0) return true;
 
-          // If vehicle already has this cluster for this date, it's available
-          if (vehicleClustersForDate.has(poCluster)) return true;
+              // If vehicle already has this cluster for this date, it's available
+              if (vehicleClustersForDate.has(poCluster)) return true;
 
-          // If vehicle has a different cluster for this date, it's not available
-          return false;
-        })
+              // If vehicle has a different cluster for this date, it's not available
+              return false;
+            })
         .sort((a, b) => {
           // First sort by capacity (smallest first)
           if (a.capacity !== b.capacity) {
@@ -709,14 +679,7 @@ const POMonitoring = () => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    if (name === 'companyName') {
-      // When company changes, reset location if it's not in the new company's locations
-      const newForm = { ...form, [name]: value };
-      if (value && customers[value] && !customers[value].includes(form.location)) {
-        newForm.location = '';
-      }
-      setForm(newForm);
-    } else if (name === 'phone') {
+    if (name === 'phone') {
       // Validate phone number
       const validation = validatePhilippinePhoneNumber(value);
       setPhoneError(validation.error);
@@ -771,14 +734,15 @@ const POMonitoring = () => {
 
       let price = 0;
       if (item.pricingType === 'perPiece') {
-        price = product.pricing.perPiece.price;
+        // Use custom price if available, otherwise use default
+        price = item.customPrice || product.pricing.perPiece.price;
       } else if (item.pricingType === 'perPackage') {
         if (Array.isArray(product.pricing.perPackage)) {
           // For Jumbo Roll with multiple packaging options
           const selectedPackage = product.pricing.perPackage.find(p => p.quantity === item.packageQuantity);
-          price = selectedPackage ? selectedPackage.price : product.pricing.perPackage[0].price;
+          price = item.customPrice || (selectedPackage ? selectedPackage.price : product.pricing.perPackage[0].price);
         } else {
-          price = product.pricing.perPackage.price;
+          price = item.customPrice || product.pricing.perPackage.price;
         }
       }
 
@@ -786,14 +750,7 @@ const POMonitoring = () => {
     }, 0);
   }, []);
 
-  const findCluster = (location) => {
-    for (const [clusterName, cluster] of Object.entries(clusters)) {
-      if (cluster.locations.includes(location)) {
-        return clusterName;
-      }
-    }
-    return null;
-  };
+
 
   // Debug logging for cluster assignment
   console.log('Available clusters:', clusters);
@@ -813,7 +770,7 @@ const POMonitoring = () => {
             cache[vehicle.id][dateStr] = { load: 0, cluster: null };
           }
           cache[vehicle.id][dateStr].load += calculateLoad(assignedPO);
-          const c = findCluster(assignedPO.location);
+          const c = assignedPO.cluster;
           if (cache[vehicle.id][dateStr].cluster && cache[vehicle.id][dateStr].cluster !== c) {
             // Mixed clusters shouldn't happen; treat as locked and disallow further mixing.
             cache[vehicle.id][dateStr].cluster = cache[vehicle.id][dateStr].cluster;
@@ -839,22 +796,21 @@ const POMonitoring = () => {
   // Optimized vehicle scoring function
   const scoreVehiclesForPO = useCallback((po, vehicles, pos) => {
     const load = calculateLoad(po);
-    const clusterName = findCluster(po.location);
+    const clusterName = po.cluster;
 
-    // If location is not in any defined cluster, no vehicles are eligible
+    // If PO has no cluster assigned, no vehicles are eligible
     if (!clusterName) {
       return [];
     }
 
-    // Filter by availability, capacity for the PO's date, cluster lock per date, and driver status
+    // Filter by availability, capacity for the PO's date, and driver status
+    // Since clusters are now just groupings, we only check capacity and dates
     const eligibleVehicles = vehicles.filter(v => {
       const usedForDate = getUsedLoadForVehicleOnDate(v, po.deliveryDate);
-      const clusterForDate = getClusterForVehicleOnDate(v, po.deliveryDate);
       const hasCapacity = (v.capacity - usedForDate) >= load;
-      const clusterOk = !clusterForDate || clusterForDate === clusterName;
       // Check driver status - vehicle is only available if driver status is 'Available'
       const driverAvailable = v.status === 'Available';
-      return v.ready && hasCapacity && clusterOk && driverAvailable;
+      return v.ready && hasCapacity && driverAvailable;
     });
 
     if (eligibleVehicles.length === 0) return [];
@@ -864,12 +820,6 @@ const POMonitoring = () => {
       const usedForDate = getUsedLoadForVehicleOnDate(v, po.deliveryDate);
       const remainingCapacity = v.capacity - usedForDate;
       const utilizationAfter = (usedForDate + load) / v.capacity;
-
-      // Calculate cluster efficiency (prefer vehicles already assigned to same cluster)
-      const clusterMatches = (v.assignedPOs || []).reduce((acc, poId) => {
-        const assignedPO = pos.find(p => p.id === poId);
-        return acc + (assignedPO && assignedPO.deliveryDate === po.deliveryDate && findCluster(assignedPO.location) === clusterName ? 1 : 0);
-      }, 0);
 
       // Calculate load efficiency (prefer vehicles that will be well-utilized but not over-utilized)
       let loadEfficiency = 0;
@@ -907,15 +857,14 @@ const POMonitoring = () => {
         sizeEfficiency = -0.5;
       }
 
-      // Total score combines multiple factors with weighted priorities
-      const totalScore = (clusterMatches * 3) + loadEfficiency + sizeEfficiency;
+      // Total score combines load and size efficiency (no cluster restrictions)
+      const totalScore = loadEfficiency + sizeEfficiency;
 
       return {
         vehicle: v,
         totalScore,
         utilizationAfter,
         remainingCapacity,
-        clusterMatches,
         loadEfficiency,
         sizeEfficiency
       };
@@ -936,11 +885,11 @@ const POMonitoring = () => {
   }, []);
 
   const assignVehicleAutomatically = useCallback((po) => {
-    const clusterName = findCluster(po.location);
+    const clusterName = po.cluster;
 
-    // If location is not in any defined cluster, cannot assign
+    // If PO has no cluster assigned, cannot assign
     if (!clusterName) {
-      console.log(`PO ${po.customId} cannot be assigned - location ${po.location} not in any cluster`);
+      console.log(`PO ${po.customId} cannot be assigned - no cluster assigned`);
       return null;
     }
 
@@ -1026,8 +975,8 @@ const POMonitoring = () => {
       }
 
       // Rule 2: Cluster Matching - all POs in vehicle must be from same cluster
-      const vehicleCluster = findCluster(assignedPOs[0].location);
-      const clusterMismatch = assignedPOs.some(assignedPO => findCluster(assignedPO.location) !== vehicleCluster);
+      const vehicleCluster = assignedPOs[0].cluster;
+      const clusterMismatch = assignedPOs.some(assignedPO => assignedPO.cluster !== vehicleCluster);
 
       if (clusterMismatch) {
         return false;
@@ -1055,10 +1004,9 @@ const POMonitoring = () => {
         const remainingCapacity = v.capacity - currentLoad;
         const utilizationAfter = (currentLoad + load) / v.capacity;
 
-        // Prefer vehicles already serving this cluster/date combination
-        const alreadyServingCluster = assignedPOs.some(assignedPO =>
-          assignedPO.deliveryDate === po.deliveryDate && findCluster(assignedPO.location) === clusterName
-        ) ? 10 : 0;
+        // Since clusters are now simple groupings without geographic restrictions,
+        // we don't need to check for already serving cluster combinations
+        const alreadyServingCluster = 0;
 
         // Prefer good utilization (70-90%)
         let utilizationScore = 0;
@@ -1108,7 +1056,7 @@ const POMonitoring = () => {
     });
 
     return chosen.name;
-  }, [vehicles, pos, calculateLoad, getUsedLoadForVehicleOnDate, findCluster, updateVehicle]);
+  }, [vehicles, pos, calculateLoad, getUsedLoadForVehicleOnDate, updateVehicle]);
 
   const removeProduct = (index) => {
     const updatedProducts = form.products.filter((_, i) => i !== index);
@@ -1127,10 +1075,10 @@ const POMonitoring = () => {
 
   const handleEditInputChange = (e) => {
     const { name, value } = e.target;
-    if (name === 'companyName') {
-      // When company changes, reset location if it's not in the new company's locations
+    if (name === 'cluster') {
+      // When cluster changes, reset location if it's not in the new cluster's locations
       const newEditForm = { ...editForm, [name]: value };
-      if (value && customers[value] && !customers[value].includes(editForm.location)) {
+      if (value && clusters[value] && !clusters[value].locations.includes(editForm.location)) {
         newEditForm.location = '';
       }
       setEditForm(newEditForm);
@@ -1164,7 +1112,7 @@ const POMonitoring = () => {
   };
 
   const handleSaveUpdate = async () => {
-    if (!editForm.poNumber || !editForm.companyName || !editForm.poDate || !editForm.location || !editForm.deliveryDate || !editForm.address || editForm.products.length === 0 || editForm.products.some(p => !p.product || p.quantity <= 0 || !p.pricingType)) {
+    if (!editForm.poNumber || !editForm.companyName || !editForm.poDate || !editForm.address || editForm.products.length === 0 || editForm.products.some(p => !p.product || p.quantity <= 0 || !p.pricingType)) {
       setNotification({
         type: 'error',
         title: 'Missing Information',
@@ -1288,7 +1236,7 @@ const POMonitoring = () => {
       return;
     }
 
-    if (!form.poNumber || !form.companyName || !form.poDate || !form.location || !form.deliveryDate || !form.address || form.products.length === 0 || form.products.some(p => !p.product || p.quantity <= 0 || !p.pricingType)) {
+    if (!form.poNumber || !form.companyName || !form.poDate || !form.address || form.products.length === 0 || form.products.some(p => !p.product || p.quantity <= 0 || !p.pricingType)) {
       setNotification({
         type: 'error',
         title: 'Missing Information',
@@ -1457,22 +1405,13 @@ const POMonitoring = () => {
             return;
           }
    
-          // Check if location is in a defined cluster
-          const poCluster = findCluster(newPO.location);
-          if (!poCluster) {
-            setNotification({
-              type: 'error',
-              title: 'Invalid Location',
-              message: 'This location is not assigned to any cluster. Please select a valid location or contact an administrator.'
-            });
-            return;
-          }
+
 
           const docRef = await addDoc(collection(db, 'pos'), newPO);
           const poId = docRef.id;
 
-          // Automate assignment
-          const assignmentResult = assignVehicleAutomatically({ ...newPO, id: poId });
+      // Automate assignment (only if delivery date is specified)
+      const assignmentResult = newPO.deliveryDate ? assignVehicleAutomatically({ ...newPO, id: poId }) : null;
           if (assignmentResult === 'on-hold') {
             // PO goes on hold due to date-based balancing rules
             await updateDoc(docRef, { status: 'on-hold', load: newPO.load });
@@ -1521,14 +1460,12 @@ const POMonitoring = () => {
             await updateDoc(docRef, { status: 'on-hold', load: newPO.load });
             newPO.status = 'on-hold';
 
-            // Check if the issue is driver status or cluster availability
-            const clusterName = findCluster(newPO.location);
+            // Check if the issue is driver status or capacity availability
+            const clusterName = newPO.cluster;
             const allVehiclesForDate = vehicles.filter(v => {
               const usedForDate = getUsedLoadForVehicleOnDate(v, newPO.deliveryDate);
-              const clusterForDate = getClusterForVehicleOnDate(v, newPO.deliveryDate);
               const hasCapacity = (v.capacity - usedForDate) >= newPO.load;
-              const clusterOk = !clusterForDate || clusterForDate === clusterName;
-              return v.ready && hasCapacity && clusterOk;
+              return v.ready && hasCapacity;
             });
 
             const unavailableDrivers = allVehiclesForDate.filter(v => v.status !== 'Available');
@@ -1538,13 +1475,13 @@ const POMonitoring = () => {
               setNotification({
                 type: 'warning',
                 title: 'PO Placed On Hold',
-                message: `No suitable vehicles available in cluster ${clusterName}. All vehicles have drivers with unavailable status: ${unavailableDrivers.map(v => `${v.name} (${v.status})`).join(', ')}. Please update driver statuses to "Available" or wait for drivers to become available. The PO has been placed on hold for now.`
+                message: `No suitable vehicles available. All vehicles have drivers with unavailable status: ${unavailableDrivers.map(v => `${v.name} (${v.status})`).join(', ')}. Please update driver statuses to "Available" or wait for drivers to become available. The PO has been placed on hold for now.`
               });
             } else if (availableVehicles.length === 0) {
               setNotification({
                 type: 'warning',
                 title: 'PO Placed On Hold',
-                message: `No suitable vehicles available in cluster ${clusterName} for this delivery date. Vehicles may be at capacity or restricted to other geographic clusters. The PO has been placed on hold and will be available for assignment when suitable vehicles become available.`
+                message: `No suitable vehicles available for this delivery date. Vehicles may be at capacity. The PO has been placed on hold and will be available for assignment when suitable vehicles become available.`
               });
             } else {
               setNotification({
@@ -1558,7 +1495,7 @@ const POMonitoring = () => {
             await addDoc(collection(db, 'history'), {
               timestamp: new Date(),
               action: 'PO Placed On Hold',
-              details: `PO ${newPO.customId} placed on hold - no available vehicles in cluster ${clusterName}`
+              details: `PO ${newPO.customId} placed on hold - no available vehicles`
             });
           }
 
@@ -1566,7 +1503,7 @@ const POMonitoring = () => {
             poNumber: '',
             companyName: '',
             poDate: '',
-            location: '',
+            cluster: '',
             deliveryDate: '',
             products: [],
             totalPrice: 0,
@@ -1584,7 +1521,7 @@ const POMonitoring = () => {
           await addDoc(collection(db, 'history'), {
             timestamp: new Date(),
             action: 'Added PO',
-            details: `PO ${newPO.customId}: Company: ${newPO.companyName}, Date: ${newPO.poDate}, Location: ${newPO.location}, Delivery: ${newPO.deliveryDate}, Products: ${productsStr}, Total: ${newPO.totalPrice}`
+            details: `PO ${newPO.customId}: Company: ${newPO.companyName}, Date: ${newPO.poDate}, Delivery: ${newPO.deliveryDate}, Products: ${productsStr}, Total: ${newPO.totalPrice}`
           });
         } catch (error) {
           console.error('Error adding PO:', error);
@@ -1623,23 +1560,11 @@ const POMonitoring = () => {
         return;
       }
 
-      // Check if location is in a defined cluster
-      const poCluster = findCluster(newPO.location);
-      if (!poCluster) {
-        setNotification({
-          type: 'error',
-          title: 'Invalid Location',
-          message: 'This location is not assigned to any cluster. Please select a valid location or contact an administrator.',
-          showCloseButton: true
-        });
-        return;
-      }
-
       const docRef = await addDoc(collection(db, 'pos'), newPO);
       const poId = docRef.id;
 
-      // Automate assignment
-      const assignmentResult = assignVehicleAutomatically({ ...newPO, id: poId });
+      // Automate assignment (only if delivery date is specified)
+      const assignmentResult = newPO.deliveryDate ? assignVehicleAutomatically({ ...newPO, id: poId }) : null;
       if (assignmentResult === 'on-hold') {
         // PO goes on hold due to date-based balancing rules
         await updateDoc(docRef, { status: 'on-hold', load: newPO.load });
@@ -1672,14 +1597,12 @@ const POMonitoring = () => {
         await updateDoc(docRef, { status: 'on-hold', load: newPO.load });
         newPO.status = 'on-hold';
 
-        // Check if the issue is driver status or cluster availability
-        const clusterName = findCluster(newPO.location);
+        // Check if the issue is driver status or capacity availability
+        const clusterName = newPO.cluster;
         const allVehiclesForDate = vehicles.filter(v => {
           const usedForDate = getUsedLoadForVehicleOnDate(v, newPO.deliveryDate);
-          const clusterForDate = getClusterForVehicleOnDate(v, newPO.deliveryDate);
           const hasCapacity = (v.capacity - usedForDate) >= newPO.load;
-          const clusterOk = !clusterForDate || clusterForDate === clusterName;
-          return v.ready && hasCapacity && clusterOk;
+          return v.ready && hasCapacity;
         });
 
         const unavailableDrivers = allVehiclesForDate.filter(v => v.status !== 'Available');
@@ -1720,7 +1643,6 @@ const POMonitoring = () => {
         poNumber: '',
         companyName: '',
         poDate: '',
-        location: '',
         deliveryDate: '',
         products: [],
         totalPrice: 0,
@@ -1774,6 +1696,7 @@ const POMonitoring = () => {
       poNumber: selectedPO.customId,
       companyName: selectedPO.companyName,
       poDate: selectedPO.poDate,
+      cluster: selectedPO.cluster || '',
       location: selectedPO.location,
       deliveryDate: selectedPO.deliveryDate,
       products: [...selectedPO.products],
@@ -1903,25 +1826,25 @@ const POMonitoring = () => {
     const vehicle = vehicles.find(v => v.id === vehicleId);
     if (vehicle) {
       const usedForDate = getUsedLoadForVehicleOnDate(vehicle, selectedPO.deliveryDate);
-      const clusterName = findCluster(selectedPO.location);
+      const clusterName = selectedPO.cluster;
       const lockedCluster = getClusterForVehicleOnDate(vehicle, selectedPO.deliveryDate);
 
       if (lockedCluster && lockedCluster !== clusterName) {
         setNotification({
           type: 'error',
           title: 'Cluster Conflict',
-          message: `Cannot assign this PO to the selected vehicle. The vehicle is already assigned to deliver in ${lockedCluster} on ${selectedPO.deliveryDate}. Each vehicle can only serve one geographic cluster per delivery day to ensure efficient routing.`,
+          message: `Cannot assign this PO to the selected vehicle. The vehicle is already assigned to deliver in ${lockedCluster} on ${selectedPO.deliveryDate}. Each vehicle can only serve one cluster per delivery day to ensure efficient routing.`,
           showCloseButton: true
         });
         return;
       }
 
-      // Additional check: ensure the PO's location is in a valid cluster
+      // Additional check: ensure the PO has a valid cluster
       if (!clusterName) {
         setNotification({
           type: 'error',
-          title: 'Invalid Location',
-          message: 'This PO has a delivery location that is not assigned to any geographic cluster. Please update the PO location to a valid delivery area before assigning it to a vehicle.',
+          title: 'Invalid Cluster',
+          message: 'This PO does not have a valid cluster assigned. Please update the PO cluster before assigning it to a vehicle.',
           showCloseButton: true
         });
         return;
@@ -2002,10 +1925,14 @@ const POMonitoring = () => {
                   </div>
                   <div className="input-group">
                     <label>Company Name</label>
-                    <select name="companyName" value={form.companyName} onChange={handleInputChange} required>
-                      <option value="">Select Company</option>
-                      {Object.keys(customers).map(company => (
-                        <option key={company} value={company}>{company}</option>
+                    <input name="companyName" placeholder="Enter Company Name" value={form.companyName} onChange={handleInputChange} required />
+                  </div>
+                  <div className="input-group">
+                    <label>Cluster</label>
+                    <select name="cluster" value={form.cluster} onChange={handleInputChange} required>
+                      <option value="">Select Cluster</option>
+                      {Object.keys(clusters).map(clusterName => (
+                        <option key={clusterName} value={clusterName}>{clusters[clusterName].name}</option>
                       ))}
                     </select>
                   </div>
@@ -2013,21 +1940,6 @@ const POMonitoring = () => {
                   <div className="input-group">
                     <label>Address</label>
                     <input name="address" placeholder="Enter Delivery Address" value={form.address} onChange={handleInputChange} required />
-                  </div>
-                  <div className="input-group">
-                    <label>Contact Person</label>
-                    <input name="contact" placeholder="Enter Contact Person" value={form.contact} onChange={handleInputChange} />
-                  </div>
-                  <div className="input-group">
-                    <label>Phone Number</label>
-                    <input
-                      name="phone"
-                      placeholder="+63XXXXXXXXXX or 09XXXXXXXXX"
-                      value={form.phone}
-                      onChange={handleInputChange}
-                      className={phoneError ? 'error' : ''}
-                    />
-                    {phoneError && <span className="error-message">{phoneError}</span>}
                   </div>
                   <div className="input-group">
                     <label>Order Date</label>
@@ -2047,23 +1959,46 @@ const POMonitoring = () => {
                     {deliveryDateError && <span className="error-message">{deliveryDateError}</span>}
                   </div>
                   <div className="input-group">
-                    <label>Location</label>
-                    <select name="location" value={form.location} onChange={handleInputChange} required>
-                      <option value="">Select Location</option>
-                      {form.companyName && customers[form.companyName] ? (
-                        customers[form.companyName].map(loc => (
-                          <option key={loc} value={loc}>{loc}</option>
-                        ))
-                      ) : (
-                        allLocations.map(loc => (
-                          <option key={loc} value={loc}>{loc}</option>
-                        ))
-                      )}
-                    </select>
-                  </div>
-                  <div className="input-group">
                     <label>Terms of Payment</label>
                     <input name="termsOfPayment" placeholder="e.g., Net 30 days" value={form.termsOfPayment} onChange={handleInputChange} />
+                  </div>
+                  <div className="input-group tax-toggles">
+                    <div className="checkbox-group">
+                      <label className="checkbox-label">
+                        <input
+                          type="checkbox"
+                          name="includeTax"
+                          checked={form.includeTax}
+                          onChange={(e) => setForm({ ...form, includeTax: e.target.checked })}
+                        />
+                        <span className="checkbox-text">
+                          Include Sales Tax (12%)
+                        </span>
+                        {form.includeTax && (
+                          <span className="tax-status enabled">
+                            ✓ Enabled
+                          </span>
+                        )}
+                      </label>
+                    </div>
+                    <div className="checkbox-group">
+                      <label className="checkbox-label">
+                        <input
+                          type="checkbox"
+                          name="includeEwt"
+                          checked={form.includeEwt}
+                          onChange={(e) => setForm({ ...form, includeEwt: e.target.checked })}
+                        />
+                        <span className="checkbox-text">
+                          Include EWT (1%)
+                        </span>
+                        {form.includeEwt && (
+                          <span className="tax-status enabled">
+                            ✓ Enabled
+                          </span>
+                        )}
+                      </label>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -2083,6 +2018,23 @@ const POMonitoring = () => {
                        </p>
                        <div className="pricing-buttons">
                          <div className="pricing-row">
+                           <div className="price-input-group">
+                             <label>Custom Price per {productInfo.pricing.perPiece.unit}:</label>
+                             <input
+                               type="number"
+                               step="0.01"
+                               min="0"
+                               placeholder={`Default: ₱${productInfo.pricing.perPiece.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                               value={customPrices[`${productName}_perPiece`] || ''}
+                               onChange={(e) => {
+                                 const value = parseFloat(e.target.value) || 0;
+                                 setCustomPrices({
+                                   ...customPrices,
+                                   [`${productName}_perPiece`]: value
+                                 });
+                               }}
+                             />
+                           </div>
                            <button
                              type="button"
                              className={`pricing-btn ${form.products.some(p => p.product === productName && p.pricingType === 'perPiece') ? 'selected' : ''}`}
@@ -2100,14 +2052,15 @@ const POMonitoring = () => {
                                    product: productName,
                                    quantity: 1,
                                    pricingType: 'perPiece',
-                                   packageQuantity: null
+                                   packageQuantity: null,
+                                   customPrice: customPrices[`${productName}_perPiece`] || productInfo.pricing.perPiece.price
                                  }];
                                  const subtotal = calculateTotalPrice(updatedProducts);
                                  setForm({ ...form, products: updatedProducts, totalPrice: subtotal });
                                }
                              }}
                            >
-                             Per {productInfo.pricing.perPiece.unit}: ₱{productInfo.pricing.perPiece.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                             Per {productInfo.pricing.perPiece.unit}: ₱{(customPrices[`${productName}_perPiece`] || productInfo.pricing.perPiece.price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                            </button>
                            {(() => {
                              const pieceEntry = form.products.find(p => p.product === productName && p.pricingType === 'perPiece');
@@ -2157,6 +2110,23 @@ const POMonitoring = () => {
                              const packageEntry = form.products.find(p => p.product === productName && p.pricingType === 'perPackage' && p.packageQuantity === pkg.quantity);
                              return (
                                <div key={pkg.quantity} className="pricing-row">
+                                 <div className="price-input-group">
+                                   <label>Custom Price per Case ({pkg.quantity} {productInfo.pricing.perPiece.unit}s):</label>
+                                   <input
+                                     type="number"
+                                     step="0.01"
+                                     min="0"
+                                     placeholder={`Default: ₱${pkg.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                                     value={customPrices[`${productName}_perPackage_${pkg.quantity}`] || ''}
+                                     onChange={(e) => {
+                                       const value = parseFloat(e.target.value) || 0;
+                                       setCustomPrices({
+                                         ...customPrices,
+                                         [`${productName}_perPackage_${pkg.quantity}`]: value
+                                       });
+                                     }}
+                                   />
+                                 </div>
                                  <button
                                    type="button"
                                    className={`pricing-btn ${packageEntry ? 'selected' : ''}`}
@@ -2174,14 +2144,15 @@ const POMonitoring = () => {
                                          product: productName,
                                          quantity: 1,
                                          pricingType: 'perPackage',
-                                         packageQuantity: pkg.quantity
+                                         packageQuantity: pkg.quantity,
+                                         customPrice: customPrices[`${productName}_perPackage_${pkg.quantity}`] || pkg.price
                                        }];
                                        const subtotal = calculateTotalPrice(updatedProducts);
                                        setForm({ ...form, products: updatedProducts, totalPrice: subtotal });
                                      }
                                    }}
                                  >
-                                   Per Case ({pkg.quantity} {productInfo.pricing.perPiece.unit}s): ₱{pkg.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                   Per Case ({pkg.quantity} {productInfo.pricing.perPiece.unit}s): ₱{(customPrices[`${productName}_perPackage_${pkg.quantity}`] || pkg.price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                  </button>
                                  {packageEntry ? (
                                    <div className="inline-quantity-controls">
@@ -2230,6 +2201,23 @@ const POMonitoring = () => {
                              const packageEntry = form.products.find(p => p.product === productName && p.pricingType === 'perPackage');
                              return (
                                <div className="pricing-row">
+                                 <div className="price-input-group">
+                                   <label>Custom Price per {productInfo.packaging.name}:</label>
+                                   <input
+                                     type="number"
+                                     step="0.01"
+                                     min="0"
+                                     placeholder={`Default: ₱${productInfo.pricing.perPackage.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                                     value={customPrices[`${productName}_perPackage`] || ''}
+                                     onChange={(e) => {
+                                       const value = parseFloat(e.target.value) || 0;
+                                       setCustomPrices({
+                                         ...customPrices,
+                                         [`${productName}_perPackage`]: value
+                                       });
+                                     }}
+                                   />
+                                 </div>
                                  <button
                                    type="button"
                                    className={`pricing-btn ${packageEntry ? 'selected' : ''}`}
@@ -2247,14 +2235,15 @@ const POMonitoring = () => {
                                          product: productName,
                                          quantity: 1,
                                          pricingType: 'perPackage',
-                                         packageQuantity: productInfo.packaging.quantity
+                                         packageQuantity: productInfo.packaging.quantity,
+                                         customPrice: customPrices[`${productName}_perPackage`] || productInfo.pricing.perPackage.price
                                        }];
                                        const subtotal = calculateTotalPrice(updatedProducts);
                                        setForm({ ...form, products: updatedProducts, totalPrice: subtotal });
                                      }
                                    }}
                                  >
-                                   Per {productInfo.packaging.name}: ₱{productInfo.pricing.perPackage.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                   Per {productInfo.packaging.name}: ₱{(customPrices[`${productName}_perPackage`] || productInfo.pricing.perPackage.price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                  </button>
                                  {packageEntry ? (
                                    <div className="inline-quantity-controls">
@@ -2317,15 +2306,15 @@ const POMonitoring = () => {
 
                       if (product) {
                         if (item.pricingType === 'perPiece') {
-                          price = product.pricing.perPiece.price;
+                          price = item.customPrice || product.pricing.perPiece.price;
                           description = `${item.product} (${product.pricing.perPiece.unit}) x ${item.quantity}`;
                         } else if (item.pricingType === 'perPackage') {
                           if (Array.isArray(product.pricing.perPackage)) {
                             const selectedPackage = product.pricing.perPackage.find(p => p.quantity === item.packageQuantity);
-                            price = selectedPackage ? selectedPackage.price : product.pricing.perPackage[0].price;
+                            price = item.customPrice || (selectedPackage ? selectedPackage.price : product.pricing.perPackage[0].price);
                             description = `${item.product} (${item.packageQuantity} ${product.pricing.perPiece.unit}s) x ${item.quantity}`;
                           } else {
-                            price = product.pricing.perPackage.price;
+                            price = item.customPrice || product.pricing.perPackage.price;
                             description = `${item.product} (${product.packaging.name}) x ${item.quantity}`;
                           }
                         }
@@ -2344,13 +2333,26 @@ const POMonitoring = () => {
                      <span>Subtotal:</span>
                      <span>₱{form.totalPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                    </div>
-                   <div className="total-row">
-                     <span>Sales Tax (12%):</span>
-                     <span>₱{(form.totalPrice * 0.12).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                   </div>
+                   {form.includeTax && (
+                     <div className="total-row">
+                       <span>Sales Tax (12%):</span>
+                       <span>₱{(form.totalPrice * 0.12).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                     </div>
+                   )}
+                   {form.includeEwt && (
+                     <div className="total-row">
+                       <span>EWT (1%):</span>
+                       <span>₱{(form.totalPrice * 0.01).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                     </div>
+                   )}
                    <div className="total-row final-total">
                      <span>Total:</span>
-                     <span>₱{(form.totalPrice * 1.12).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                     <span>₱{(() => {
+                       let total = form.totalPrice;
+                       if (form.includeTax) total *= 1.12;
+                       if (form.includeEwt) total *= 0.99; // 1% deduction
+                       return total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                     })()}</span>
                    </div>
                  </div>
                 </div>
@@ -2551,10 +2553,14 @@ const POMonitoring = () => {
                     </div>
                     <div className="input-group">
                       <label>Company Name</label>
-                      <select name="companyName" value={editForm.companyName} onChange={handleEditInputChange} required>
-                        <option value="">Select Company</option>
-                        {Object.keys(customers).map(company => (
-                          <option key={company} value={company}>{company}</option>
+                      <input name="companyName" placeholder="Enter Company Name" value={editForm.companyName} onChange={handleEditInputChange} required />
+                    </div>
+                    <div className="input-group">
+                      <label>Cluster</label>
+                      <select name="cluster" value={editForm.cluster} onChange={handleEditInputChange} required>
+                        <option value="">Select Cluster</option>
+                        {Object.keys(clusters).map(clusterName => (
+                          <option key={clusterName} value={clusterName}>{clusters[clusterName].name}</option>
                         ))}
                       </select>
                     </div>
@@ -2585,21 +2591,6 @@ const POMonitoring = () => {
                         onChange={(e) => handleEditInputChange({ target: { name: 'deliveryDate', value: e.target.value } })}
                         min={new Date().toISOString().split('T')[0]}
                       />
-                    </div>
-                    <div className="input-group">
-                      <label>Location</label>
-                      <select name="location" value={editForm.location} onChange={handleEditInputChange} required>
-                        <option value="">Select Location</option>
-                        {editForm.companyName && customers[editForm.companyName] ? (
-                          customers[editForm.companyName].map(loc => (
-                            <option key={loc} value={loc}>{loc}</option>
-                          ))
-                        ) : (
-                          allLocations.map(loc => (
-                            <option key={loc} value={loc}>{loc}</option>
-                          ))
-                        )}
-                      </select>
                     </div>
                     <div className="input-group">
                       <label>Terms of Payment</label>
