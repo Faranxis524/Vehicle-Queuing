@@ -49,10 +49,10 @@ const products = {
 };
 
 const clusters = {
-  'Cluster 1': { name: 'Cluster 1' },
-  'Cluster 2': { name: 'Cluster 2' },
-  'Cluster 3': { name: 'Cluster 3' },
-  'Cluster 4': { name: 'Cluster 4' }
+  'Cluster 1': { name: 'Cluster 1 - North Luzon' },
+  'Cluster 2': { name: 'Cluster 2 - MNL North/East' },
+  'Cluster 3': { name: 'Cluster 3 - MNL South/Center' },
+  'Cluster 4': { name: 'Cluster 4 - South Luzon' }
 };
 
 const allLocations = [];
@@ -750,6 +750,21 @@ const POMonitoring = () => {
     }, 0);
   }, []);
 
+  // Check if all required fields are filled
+  const areRequiredFieldsFilled = useCallback(() => {
+    return (
+      form.poNumber.trim() !== '' &&
+      form.companyName.trim() !== '' &&
+      form.poDate !== '' &&
+      form.address.trim() !== '' &&
+      form.contact.trim() !== '' &&
+      form.phone.trim() !== '' &&
+      form.cluster !== '' &&
+      form.products.length > 0 &&
+      form.products.every(p => p.product && p.quantity > 0 && p.pricingType)
+    );
+  }, [form]);
+
 
 
   // Debug logging for cluster assignment
@@ -1236,7 +1251,7 @@ const POMonitoring = () => {
       return;
     }
 
-    if (!form.poNumber || !form.companyName || !form.poDate || !form.address || form.products.length === 0 || form.products.some(p => !p.product || p.quantity <= 0 || !p.pricingType)) {
+    if (!form.poNumber || !form.companyName || !form.poDate || !form.address || !form.contact || !form.phone || form.products.length === 0 || form.products.some(p => !p.product || p.quantity <= 0 || !p.pricingType)) {
       setNotification({
         type: 'error',
         title: 'Missing Information',
@@ -1410,94 +1425,140 @@ const POMonitoring = () => {
           const docRef = await addDoc(collection(db, 'pos'), newPO);
           const poId = docRef.id;
 
-      // Automate assignment (only if delivery date is specified)
-      const assignmentResult = newPO.deliveryDate ? assignVehicleAutomatically({ ...newPO, id: poId }) : null;
-          if (assignmentResult === 'on-hold') {
-            // PO goes on hold due to date-based balancing rules
-            await updateDoc(docRef, { status: 'on-hold', load: newPO.load });
-            newPO.status = 'on-hold';
+      // Determine status based on delivery date logic
+      let initialStatus = 'pending';
+      let shouldAssign = false;
 
-            // Log on-hold status
-            await addDoc(collection(db, 'history'), {
-              timestamp: new Date(),
-              action: 'PO Placed On Hold (Date Balancing)',
-              details: `PO ${newPO.customId} placed on hold due to date-based balancing rules`
+      if (!newPO.deliveryDate) {
+        // No delivery date → on-hold
+        initialStatus = 'on-hold';
+        shouldAssign = false;
+      } else {
+        // Check if this delivery date is the earliest among existing delivery dates (not including the new PO)
+        const existingDeliveryDates = new Set();
+        pos.forEach(po => {
+          // Include all existing POs with delivery dates (assigned, pending, on-hold, in-transit)
+          if (po.deliveryDate && po.status !== 'completed') {
+            existingDeliveryDates.add(po.deliveryDate);
+          }
+        });
+
+        // Convert to array and sort to find the earliest existing date
+        const sortedExistingDates = Array.from(existingDeliveryDates).sort();
+        const earliestExistingDate = sortedExistingDates.length > 0 ? sortedExistingDates[0] : null;
+        const currentDate = new Date().toISOString().split('T')[0];
+
+        // If this PO's delivery date is the earliest among existing POs → try to assign
+        if (newPO.deliveryDate === earliestExistingDate) {
+          shouldAssign = true;
+          initialStatus = 'pending'; // Will be set to 'assigned' if assignment succeeds
+        } else {
+          // Has delivery date but not the earliest among existing POs → pending, don't assign
+          shouldAssign = false;
+          initialStatus = 'pending';
+        }
+      }
+
+      // Set initial status
+      newPO.status = initialStatus;
+
+      // Set initial status in Firestore
+      await updateDoc(docRef, { status: initialStatus, load: newPO.load });
+
+      // Automate assignment based on the logic above
+      if (shouldAssign) {
+        const assignmentResult = assignVehicleAutomatically({ ...newPO, id: poId });
+        if (assignmentResult === 'on-hold') {
+          // PO goes on hold due to date-based balancing rules
+          await updateDoc(docRef, { status: 'on-hold' });
+          newPO.status = 'on-hold';
+
+          // Log on-hold status
+          await addDoc(collection(db, 'history'), {
+            timestamp: new Date(),
+            action: 'PO Placed On Hold (Date Balancing)',
+            details: `PO ${newPO.customId} placed on hold due to date-based balancing rules`
+          });
+        } else if (assignmentResult) {
+          // Successfully assigned to a vehicle
+          // Keep Firestore field naming as 'assignedTruck' for backward compatibility
+          // Also persist computed load so vehicle loads can be reconstructed after refresh
+          await updateDoc(docRef, { assignedTruck: assignmentResult, status: 'assigned' });
+          newPO.assignedTruck = assignmentResult;
+          newPO.status = 'assigned';
+
+          // assignedPOs and currentLoad already updated via VehicleContext.assignLoad
+
+          // Log assignment
+          await addDoc(collection(db, 'history'), {
+            timestamp: new Date(),
+            action: 'Auto-Assigned PO to Vehicle',
+            details: `PO ${newPO.customId} auto-assigned to ${assignmentResult}`
+          });
+
+          // After successful assignment, enforce system-wide date rules using rebalance
+          try {
+            const posQuery = query(collection(db, 'pos'), orderBy('createdAt'));
+            const querySnapshot = await getDocs(posQuery);
+            const allPOs = [];
+            querySnapshot.forEach((doc) => {
+              allPOs.push({ id: doc.id, customId: doc.data().customId, ...doc.data() });
             });
-          } else if (assignmentResult) {
-            // Successfully assigned to a vehicle
-            // Keep Firestore field naming as 'assignedTruck' for backward compatibility
-            // Also persist computed load so vehicle loads can be reconstructed after refresh
-            await updateDoc(docRef, { assignedTruck: assignmentResult, load: newPO.load, status: 'assigned' });
-            newPO.assignedTruck = assignmentResult;
-            newPO.status = 'assigned';
 
-            // assignedPOs and currentLoad already updated via VehicleContext.assignLoad
+            const rebalanceResult = await rebalanceLoads(allPOs);
+            console.log('Auto-rebalance after PO assignment:', rebalanceResult);
+          } catch (rebalanceError) {
+            console.error('Auto-rebalance failed after PO assignment:', rebalanceError);
+            // Don't fail the PO creation if rebalancing fails
+          }
+        } else {
+          // Set status to on-hold when no vehicle is available
+          await updateDoc(docRef, { status: 'on-hold' });
+          newPO.status = 'on-hold';
 
-            // Log assignment
-            await addDoc(collection(db, 'history'), {
-              timestamp: new Date(),
-              action: 'Auto-Assigned PO to Vehicle',
-              details: `PO ${newPO.customId} auto-assigned to ${assignmentResult}`
+          // Check if the issue is driver status or capacity availability
+          const clusterName = newPO.cluster;
+          const allVehiclesForDate = vehicles.filter(v => {
+            const usedForDate = getUsedLoadForVehicleOnDate(v, newPO.deliveryDate);
+            const hasCapacity = (v.capacity - usedForDate) >= newPO.load;
+            return v.ready && hasCapacity;
+          });
+
+          const unavailableDrivers = allVehiclesForDate.filter(v => v.status !== 'Available');
+          const availableVehicles = allVehiclesForDate.filter(v => v.status === 'Available');
+
+          if (unavailableDrivers.length > 0 && availableVehicles.length === 0) {
+            setNotification({
+              type: 'warning',
+              title: 'PO Placed On Hold',
+              message: `No suitable vehicles available. All vehicles have drivers with unavailable status: ${unavailableDrivers.map(v => `${v.name} (${v.status})`).join(', ')}. Please update driver statuses to "Available" or wait for drivers to become available. The PO has been placed on hold for now.`
             });
-
-            // After successful assignment, enforce system-wide date rules using rebalance
-            try {
-              const posQuery = query(collection(db, 'pos'), orderBy('createdAt'));
-              const querySnapshot = await getDocs(posQuery);
-              const allPOs = [];
-              querySnapshot.forEach((doc) => {
-                allPOs.push({ id: doc.id, customId: doc.data().customId, ...doc.data() });
-              });
-
-              const rebalanceResult = await rebalanceLoads(allPOs);
-              console.log('Auto-rebalance after PO assignment:', rebalanceResult);
-            } catch (rebalanceError) {
-              console.error('Auto-rebalance failed after PO assignment:', rebalanceError);
-              // Don't fail the PO creation if rebalancing fails
-            }
+          } else if (availableVehicles.length === 0) {
+            setNotification({
+              type: 'warning',
+              title: 'PO Placed On Hold',
+              message: `No suitable vehicles available for this delivery date. Vehicles may be at capacity. The PO has been placed on hold and will be available for assignment when suitable vehicles become available.`
+            });
           } else {
-            // Set status to on-hold when no vehicle is available
-            await updateDoc(docRef, { status: 'on-hold', load: newPO.load });
-            newPO.status = 'on-hold';
-
-            // Check if the issue is driver status or capacity availability
-            const clusterName = newPO.cluster;
-            const allVehiclesForDate = vehicles.filter(v => {
-              const usedForDate = getUsedLoadForVehicleOnDate(v, newPO.deliveryDate);
-              const hasCapacity = (v.capacity - usedForDate) >= newPO.load;
-              return v.ready && hasCapacity;
-            });
-
-            const unavailableDrivers = allVehiclesForDate.filter(v => v.status !== 'Available');
-            const availableVehicles = allVehiclesForDate.filter(v => v.status === 'Available');
-
-            if (unavailableDrivers.length > 0 && availableVehicles.length === 0) {
-              setNotification({
-                type: 'warning',
-                title: 'PO Placed On Hold',
-                message: `No suitable vehicles available. All vehicles have drivers with unavailable status: ${unavailableDrivers.map(v => `${v.name} (${v.status})`).join(', ')}. Please update driver statuses to "Available" or wait for drivers to become available. The PO has been placed on hold for now.`
-              });
-            } else if (availableVehicles.length === 0) {
-              setNotification({
-                type: 'warning',
-                title: 'PO Placed On Hold',
-                message: `No suitable vehicles available for this delivery date. Vehicles may be at capacity. The PO has been placed on hold and will be available for assignment when suitable vehicles become available.`
-              });
-            } else {
-              setNotification({
-                type: 'warning',
-                title: 'PO Placed On Hold',
-                message: 'No suitable vehicle is available for this PO at this time. The PO has been placed on hold and will be automatically assigned when a suitable vehicle becomes available.'
-              });
-            }
-
-            // Log on-hold status
-            await addDoc(collection(db, 'history'), {
-              timestamp: new Date(),
-              action: 'PO Placed On Hold',
-              details: `PO ${newPO.customId} placed on hold - no available vehicles`
+            setNotification({
+              type: 'warning',
+              title: 'PO Placed On Hold',
+              message: 'No suitable vehicle is available for this PO at this time. The PO has been placed on hold and will be automatically assigned when a suitable vehicle becomes available.'
             });
           }
+
+          // Log on-hold status
+          await addDoc(collection(db, 'history'), {
+            timestamp: new Date(),
+            action: 'PO Placed On Hold',
+            details: `PO ${newPO.customId} placed on hold - no available vehicles`
+          });
+        }
+      } else {
+        // Don't attempt assignment for POs with delivery dates that are not the earliest
+        // Status is already set to 'pending' or 'on-hold' based on delivery date presence
+        newPO.status = initialStatus;
+      }
 
           setForm({
             poNumber: '',
@@ -1920,15 +1981,15 @@ const POMonitoring = () => {
                 <h3>Order Information</h3>
                 <div className="input-grid">
                   <div className="input-group">
-                    <label>PO Number</label>
+                    <label>PO Number <span className="required-asterisk">*</span></label>
                     <input name="poNumber" placeholder="Enter PO Number" value={form.poNumber} onChange={handleInputChange} required />
                   </div>
                   <div className="input-group">
-                    <label>Company Name</label>
+                    <label>Company Name <span className="required-asterisk">*</span></label>
                     <input name="companyName" placeholder="Enter Company Name" value={form.companyName} onChange={handleInputChange} required />
                   </div>
                   <div className="input-group">
-                    <label>Cluster</label>
+                    <label>Cluster <span className="required-asterisk">*</span></label>
                     <select name="cluster" value={form.cluster} onChange={handleInputChange} required>
                       <option value="">Select Cluster</option>
                       {Object.keys(clusters).map(clusterName => (
@@ -1938,11 +1999,19 @@ const POMonitoring = () => {
                   </div>
 
                   <div className="input-group">
-                    <label>Address</label>
+                    <label>Address <span className="required-asterisk">*</span></label>
                     <input name="address" placeholder="Enter Delivery Address" value={form.address} onChange={handleInputChange} required />
                   </div>
                   <div className="input-group">
-                    <label>Order Date</label>
+                    <label>Contact Person <span className="required-asterisk">*</span></label>
+                    <input name="contact" placeholder="Enter Contact Person" value={form.contact} onChange={handleInputChange} />
+                  </div>
+                  <div className="input-group">
+                    <label>Contact Number <span className="required-asterisk">*</span></label>
+                    <input name="phone" placeholder="Enter Contact Number" value={form.phone} onChange={handleInputChange} />
+                  </div>
+                  <div className="input-group">
+                    <label>Order Date <span className="required-asterisk">*</span></label>
                     <CustomDatePicker
                       value={form.poDate}
                       onChange={(e) => handleInputChange({ target: { name: 'poDate', value: e.target.value } })}
@@ -2360,7 +2429,12 @@ const POMonitoring = () => {
 
               <div className="kiosk-actions">
                 <button type="button" className="cancel-btn" onClick={() => setShowForm(false)}>Cancel</button>
-                <button type="submit" className="submit-btn" disabled={loading || form.products.length === 0} onClick={handleSubmit}>
+                <button
+                  type="submit"
+                  className={`submit-btn ${areRequiredFieldsFilled() && form.products.length > 0 ? 'ready' : ''}`}
+                  disabled={loading || form.products.length === 0}
+                  onClick={handleSubmit}
+                >
                   {loading ? 'Creating Order...' : 'Create Purchase Order'}
                 </button>
               </div>

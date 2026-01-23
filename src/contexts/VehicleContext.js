@@ -370,8 +370,9 @@ export const VehicleProvider = ({ children }) => {
     let activePOs = allPOs.filter(po => po.status !== 'completed' && po.status !== 'in-transit' && po.status !== 'delivered');
 
     // Strict date rule: Only rebalance POs that are current date OR earliest existing date
+    // POs with delivery dates that are not earliest will be set to pending status
     const strictDatePOs = [];
-    const onHoldDatePOs = [];
+    const pendingDatePOs = [];
 
     activePOs.forEach(po => {
       const isAllowedDate = po.deliveryDate === currentDate ||
@@ -380,7 +381,8 @@ export const VehicleProvider = ({ children }) => {
       if (isAllowedDate) {
         strictDatePOs.push(po);
       } else {
-        onHoldDatePOs.push(po);
+        // Has delivery date but not earliest → pending (not on-hold)
+        pendingDatePOs.push(po);
       }
     });
 
@@ -401,6 +403,7 @@ export const VehicleProvider = ({ children }) => {
     
     const assignmentResults = [];
     const onHoldPOs = [];
+    const pendingPOs = [];
     const errorPOs = [];
     
     // Process each delivery date group
@@ -452,11 +455,21 @@ export const VehicleProvider = ({ children }) => {
           });
           
           if (clusterVehiclesWithDifferentDates.length > 0) {
-            // Rule 7: On-Hold condition - cluster assigned to vehicle with different date
-            onHoldPOs.push({
-              po,
-              reason: `Cluster ${clusterName} already assigned to vehicle(s) with different delivery date`
-            });
+            // Rule 7: On-Hold condition - the PO has no delivery date yet
+            // if the PO has different delivery date than the earliest, make it pending status
+            if (!po.deliveryDate) {
+              // No delivery date → on-hold
+              onHoldPOs.push({
+                po,
+                reason: `Cluster ${clusterName} already assigned to vehicle(s) with different delivery date`
+              });
+            } else if (po.deliveryDate !== sortedDates[0]) {
+              // Has delivery date but different from earliest → pending
+              pendingPOs.push({
+                po,
+                reason: `Delivery date ${po.deliveryDate} is not the earliest date for cluster ${clusterName}`
+              });
+            }
             continue;
           }
           
@@ -637,7 +650,7 @@ export const VehicleProvider = ({ children }) => {
         });
       }
       
-      // Place on-hold POs (Rule 7 violations - same cluster, different date)
+      // Place on-hold POs (Rule 7 violations - no delivery date)
       for (const onHold of onHoldPOs) {
         await updateDoc(doc(db, 'pos', onHold.po.id), {
           assignedTruck: null,
@@ -652,18 +665,33 @@ export const VehicleProvider = ({ children }) => {
         });
       }
 
-      // Place POs on hold due to strict date rule (not current or earliest date)
-      for (const dateHoldPO of onHoldDatePOs) {
-        await updateDoc(doc(db, 'pos', dateHoldPO.id), {
+      // Place pending POs (Rule 7 violations - delivery date different from earliest)
+      for (const pending of pendingPOs) {
+        await updateDoc(doc(db, 'pos', pending.po.id), {
           assignedTruck: null,
-          status: 'on-hold',
-          load: calculateLoad(dateHoldPO)
+          status: 'pending',
+          load: calculateLoad(pending.po)
         });
 
         await addDoc(collection(db, 'history'), {
           timestamp: new Date(),
-          action: 'PO Placed On Hold During Rebalance (Date Rule)',
-          details: `PO ${dateHoldPO.customId} placed on hold - delivery date ${dateHoldPO.deliveryDate} is not current date (${currentDate}) or earliest existing date (${earliestExistingDate})`
+          action: 'PO Set to Pending During Rebalance',
+          details: `PO ${pending.po.customId} set to pending - ${pending.reason}`
+        });
+      }
+
+      // Place POs on pending due to strict date rule (not current or earliest date)
+      for (const datePendingPO of pendingDatePOs) {
+        await updateDoc(doc(db, 'pos', datePendingPO.id), {
+          assignedTruck: null,
+          status: 'pending',
+          load: calculateLoad(datePendingPO)
+        });
+
+        await addDoc(collection(db, 'history'), {
+          timestamp: new Date(),
+          action: 'PO Set to Pending During Rebalance (Date Rule)',
+          details: `PO ${datePendingPO.customId} set to pending - delivery date ${datePendingPO.deliveryDate} is not current date (${currentDate}) or earliest existing date (${earliestExistingDate})`
         });
       }
 
@@ -683,11 +711,12 @@ export const VehicleProvider = ({ children }) => {
       }
 
       // Generate result message
-      const totalOnHold = onHoldPOs.length + onHoldDatePOs.length;
-      const totalErrors = errorPOs.length + totalOnHold;
+      const totalOnHold = onHoldPOs.length;
+      const totalPending = pendingPOs.length + pendingDatePOs.length;
+      const totalErrors = errorPOs.length + totalOnHold + totalPending;
 
       if (totalErrors > 0) {
-        return `Rebalancing completed with issues: ${totalErrors} PO(s) cannot be assigned.\n\nSuccessfully assigned: ${assignmentResults.length} PO(s)\nOn hold (date rule): ${onHoldDatePOs.length} PO(s)\nOn hold (cluster conflict): ${onHoldPOs.length} PO(s)\nUnassignable: ${errorPOs.length} PO(s)`;
+        return `Rebalancing completed with issues: ${totalErrors} PO(s) cannot be assigned.\n\nSuccessfully assigned: ${assignmentResults.length} PO(s)\nOn hold: ${onHoldPOs.length} PO(s)\nPending: ${pendingPOs.length + pendingDatePOs.length} PO(s)\nUnassignable: ${errorPOs.length} PO(s)`;
       }
 
       return `Load rebalancing completed successfully!\n\nAssigned: ${assignmentResults.length} PO(s) across ${new Set(assignmentResults.map(a => a.vehicle)).size} vehicle(s)`;

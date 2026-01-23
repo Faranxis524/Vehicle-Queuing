@@ -730,19 +730,19 @@
   border-top: 1px solid var(--border-color, rgba(255,255,255,0.1));
 }
 
-.cancel-btn {
-  padding: 12px 24px;
-  background: linear-gradient(180deg, var(--secondary), var(--secondary-dark));
+.kiosk-actions .cancel-btn {
+  padding: 10px 20px;
+  background: linear-gradient(180deg, #dc2626, #b91c1c) !important;
   border: 1px solid rgba(255,255,255,0.18);
   color: white;
   border-radius: 8px;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
   transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease, border-color 150ms ease;
 }
 
-.cancel-btn:hover {
+.kiosk-actions .cancel-btn:hover {
   transform: translateY(-1px);
   box-shadow: var(--shadow);
   border-color: rgba(255,255,255,0.14);
@@ -771,6 +771,21 @@
   cursor: not-allowed;
   transform: none;
   box-shadow: none;
+}
+
+.submit-btn.ready {
+  background: linear-gradient(180deg, #22c55e, #16a34a);
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+  animation: pulse-green 2s infinite;
+}
+
+@keyframes pulse-green {
+  0%, 100% {
+    box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+  }
+  50% {
+    box-shadow: 0 6px 16px rgba(34, 197, 94, 0.4);
+  }
 }
 
 /* PO Detail Modal Styles */
@@ -1627,6 +1642,12 @@
 
 .checkbox-label input[type="checkbox"]:checked {
   accent-color: #16a34a;
+}
+
+.required-asterisk {
+  color: #dc2626;
+  font-weight: 600;
+  margin-left: 4px;
 }
 
 .checkbox-text {
