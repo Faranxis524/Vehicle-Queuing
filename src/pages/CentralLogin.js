@@ -278,7 +278,7 @@ const CentralLogin = () => {
         </div>
       </div>
 
-      <style jsx>{`
+      <style>{`
         .auth-page {
           min-height: 100vh;
           display: flex;

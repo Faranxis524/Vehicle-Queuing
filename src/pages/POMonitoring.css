@@ -175,7 +175,7 @@
   color: var(--text);
 }
 
-.po-form input,
+.po-form input:not([type="checkbox"]):not([type="radio"]),
 .po-form select {
   width: 100%;
   max-width: 100%;
@@ -214,7 +214,7 @@
 }
 
 /* Light theme input styles */
-[data-theme='light'] .po-form input,
+[data-theme='light'] .po-form input:not([type="checkbox"]):not([type="radio"]),
 [data-theme='light'] .po-form select {
   border-color: rgba(0,0,0,0.16);
   background: rgba(0,0,0,0.04);
@@ -403,7 +403,7 @@
   margin-bottom: 6px;
 }
 
-.input-group input,
+.input-group input:not([type="checkbox"]):not([type="radio"]),
 .input-group select {
   padding: 12px;
   border: 1px solid rgba(255,255,255,0.14);
@@ -1634,10 +1634,13 @@
   cursor: pointer;
 }
 
-.checkbox-label input[type="checkbox"] {
+.checkbox-label input[type="checkbox"],
+.checkbox-label input[type="radio"] {
   width: 16px;
   height: 16px;
   cursor: pointer;
+  -webkit-appearance: checkbox;
+  appearance: auto;
 }
 
 .checkbox-label input[type="checkbox"]:checked {
@@ -1665,24 +1668,4 @@
   margin-bottom: 0;
 }
 
-.tax-status {
-  font-weight: 600;
-  font-size: 12px;
-  padding: 2px 6px;
-  border-radius: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-left: 8px;
-}
-
-.tax-status.enabled {
-  background-color: rgba(34, 197, 94, 0.1);
-  color: #16a34a;
-  border: 1px solid rgba(34, 197, 94, 0.3);
-}
-
-.tax-status.disabled {
-  background-color: rgba(239, 68, 68, 0.1);
-  color: #dc2626;
-  border: 1px solid rgba(239, 68, 68, 0.3);
-}
+/* tax-status styles removed: checkboxes will indicate state via native checkbox only */

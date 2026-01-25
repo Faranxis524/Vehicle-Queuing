@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useMemo, useState } from 'react';
-import { doc, updateDoc, addDoc, collection } from 'firebase/firestore';
+import { doc, updateDoc, addDoc, collection, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 
 const VehicleContext = createContext();
@@ -336,23 +336,39 @@ export const VehicleProvider = ({ children }) => {
   const rebalanceLoads = async (allPOs) => {
     console.log('Starting comprehensive rebalance with all 10 rules...');
 
-    // Get all existing delivery dates from assigned POs
+    // Helper to safely update a PO: read current status and avoid
+    // overwriting an explicit on-hold state with pending.
+    const safeUpdatePO = async (poId, payload) => {
+      try {
+        const ref = doc(db, 'pos', poId);
+        const snap = await getDoc(ref);
+        const data = snap.exists() ? snap.data() : {};
+        // If the PO is explicitly on-hold, never overwrite it to pending
+        if (data.status === 'on-hold' && payload.status === 'pending') {
+          console.log(`Skipping update of PO ${poId}: would change on-hold -> pending`);
+          return;
+        }
+        // Otherwise perform the update
+        await updateDoc(ref, payload);
+      } catch (err) {
+        console.error('safeUpdatePO error for', poId, err);
+        throw err;
+      }
+    };
+
+    // Compute existing delivery dates from all active POs (exclude completed)
+    // This matches the creation/edit rules that determine eligibility by the
+    // earliest delivery date among all POs (not only currently assigned ones).
     const existingDeliveryDates = new Set();
-    vehicles.forEach(vehicle => {
-      if (vehicle.assignedPOs && vehicle.assignedPOs.length > 0) {
-        vehicle.assignedPOs.forEach(poId => {
-          const assignedPO = allPOs.find(p => p.id === poId);
-          if (assignedPO && assignedPO.deliveryDate) {
-            existingDeliveryDates.add(assignedPO.deliveryDate);
-          }
-        });
+    allPOs.forEach(po => {
+      if (po.deliveryDate && po.status !== 'completed') {
+        existingDeliveryDates.add(po.deliveryDate);
       }
     });
 
     // Convert to array and sort to find earliest date
     const sortedExistingDates = Array.from(existingDeliveryDates).sort();
     const earliestExistingDate = sortedExistingDates.length > 0 ? sortedExistingDates[0] : null;
-    const currentDate = new Date().toISOString().split('T')[0];
 
     // Rule 9: Full Recalculation - Clear all current assignments (ignore previous assignments)
     const resetVehicles = vehicles.map(v => ({
@@ -371,27 +387,37 @@ export const VehicleProvider = ({ children }) => {
 
     // Strict date rule: Only rebalance POs that are current date OR earliest existing date
     // POs with delivery dates that are not earliest will be set to pending status
-    const strictDatePOs = [];
-    const pendingDatePOs = [];
+  const strictDatePOs = [];
+  const pendingDatePOs = [];
 
-    activePOs.forEach(po => {
-      const isAllowedDate = po.deliveryDate === currentDate ||
-                           (earliestExistingDate && po.deliveryDate === earliestExistingDate);
+  // Prepare result buckets before processing so they can be referenced safely
+  const assignmentResults = [];
+  const onHoldPOs = [];
+  const pendingPOs = [];
+  const errorPOs = [];
 
-      if (isAllowedDate) {
+  activePOs.forEach(po => {
+      // POs without a delivery date should be placed on-hold
+      if (!po.deliveryDate) {
+        onHoldPOs.push({ po, reason: 'No delivery date specified' });
+        return;
+      }
+
+      // Only POs whose delivery date equals the earliest existing date are eligible
+      if (earliestExistingDate && po.deliveryDate === earliestExistingDate) {
         strictDatePOs.push(po);
       } else {
-        // Has delivery date but not earliest → pending (not on-hold)
+        // Has delivery date but not earliest → pending
         pendingDatePOs.push(po);
       }
     });
 
-    // Update active POs to only include those allowed by date rules
-    activePOs = strictDatePOs;
-    
-    // Rule 1: Delivery Date Priority - Group by delivery date, process earliest first
-    const posByDate = {};
-    activePOs.forEach(po => {
+  // Update active POs to only include those allowed by date rules
+  activePOs = strictDatePOs;
+
+  // Rule 1: Delivery Date Priority - Group by delivery date, process earliest first
+  const posByDate = {};
+  activePOs.forEach(po => {
       if (!posByDate[po.deliveryDate]) {
         posByDate[po.deliveryDate] = [];
       }
@@ -401,10 +427,7 @@ export const VehicleProvider = ({ children }) => {
     // Sort delivery dates (earliest first - priority to urgent deliveries)
     const sortedDates = Object.keys(posByDate).sort((a, b) => new Date(a) - new Date(b));
     
-    const assignmentResults = [];
-    const onHoldPOs = [];
-    const pendingPOs = [];
-    const errorPOs = [];
+  // (buckets already declared above)
     
     // Process each delivery date group
     for (const deliveryDate of sortedDates) {
@@ -618,9 +641,12 @@ export const VehicleProvider = ({ children }) => {
     
     // Apply the assignments to Firestore and update vehicle context
     try {
-      // First, clear all assignments in Firestore
+      // First, clear all assignments in Firestore for only the POs that are
+      // part of the active rebalance set and are NOT already on-hold.
+      // We must not flip existing on-hold POs (no delivery date) to pending.
       for (const po of activePOs) {
-        await updateDoc(doc(db, 'pos', po.id), {
+        if (po.status === 'on-hold') continue; // preserve explicit on-hold state
+        await safeUpdatePO(po.id, {
           assignedTruck: null,
           status: 'pending',
           load: calculateLoad(po)
@@ -637,7 +663,7 @@ export const VehicleProvider = ({ children }) => {
       
       // Apply successful assignments
       for (const assignment of assignmentResults) {
-        await updateDoc(doc(db, 'pos', assignment.po.id), {
+        await safeUpdatePO(assignment.po.id, {
           assignedTruck: assignment.vehicle,
           load: calculateLoad(assignment.po),
           status: 'assigned'
@@ -652,7 +678,7 @@ export const VehicleProvider = ({ children }) => {
       
       // Place on-hold POs (Rule 7 violations - no delivery date)
       for (const onHold of onHoldPOs) {
-        await updateDoc(doc(db, 'pos', onHold.po.id), {
+        await safeUpdatePO(onHold.po.id, {
           assignedTruck: null,
           status: 'on-hold',
           load: calculateLoad(onHold.po)
@@ -667,7 +693,8 @@ export const VehicleProvider = ({ children }) => {
 
       // Place pending POs (Rule 7 violations - delivery date different from earliest)
       for (const pending of pendingPOs) {
-        await updateDoc(doc(db, 'pos', pending.po.id), {
+        if (pending.po.status === 'on-hold') continue; // preserve on-hold
+        await safeUpdatePO(pending.po.id, {
           assignedTruck: null,
           status: 'pending',
           load: calculateLoad(pending.po)
@@ -682,7 +709,8 @@ export const VehicleProvider = ({ children }) => {
 
       // Place POs on pending due to strict date rule (not current or earliest date)
       for (const datePendingPO of pendingDatePOs) {
-        await updateDoc(doc(db, 'pos', datePendingPO.id), {
+        if (datePendingPO.status === 'on-hold') continue; // preserve on-hold
+        await safeUpdatePO(datePendingPO.id, {
           assignedTruck: null,
           status: 'pending',
           load: calculateLoad(datePendingPO)
@@ -691,7 +719,7 @@ export const VehicleProvider = ({ children }) => {
         await addDoc(collection(db, 'history'), {
           timestamp: new Date(),
           action: 'PO Set to Pending During Rebalance (Date Rule)',
-          details: `PO ${datePendingPO.customId} set to pending - delivery date ${datePendingPO.deliveryDate} is not current date (${currentDate}) or earliest existing date (${earliestExistingDate})`
+          details: `PO ${datePendingPO.customId} set to pending - delivery date ${datePendingPO.deliveryDate} is not the earliest existing delivery date (${earliestExistingDate})`
         });
       }
 
