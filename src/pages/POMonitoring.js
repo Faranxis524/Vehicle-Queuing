@@ -160,14 +160,31 @@ const CustomDatePicker = ({ value, onChange, min, className }) => {
 
   return (
     <div className="custom-date-picker" ref={datePickerRef}>
-      <input
-        type="text"
-        value={value ? new Date(value).toLocaleDateString() : ''}
-        onClick={() => setShowCalendar(!showCalendar)}
-        readOnly
-        className={className}
-        placeholder="Select date"
-      />
+      <div className="date-input-wrapper">
+        <input
+          type="text"
+          value={value ? new Date(value).toLocaleDateString() : ''}
+          onClick={() => setShowCalendar(!showCalendar)}
+          readOnly
+          className={className}
+          placeholder="Select date"
+        />
+        {value && (
+          <button
+            type="button"
+            className="clear-date-btn"
+            title="Clear date"
+            aria-label="Clear delivery date"
+            onClick={(e) => {
+              e.stopPropagation();
+              onChange({ target: { value: '' } });
+              setShowCalendar(false);
+            }}
+          >
+            ×
+          </button>
+        )}
+      </div>
       {showCalendar && (
         <div className="custom-calendar">
           <div className="calendar-header">
@@ -207,7 +224,7 @@ const CustomDatePicker = ({ value, onChange, min, className }) => {
 const POMonitoring = () => {
   const { vehicles, updateVehicle, setVehicles, assignPOToVehicle, rebalanceLoads } = useVehicles();
   const [pos, setPos] = useState([]);
-  const [form, setForm] = useState({
+  const initialForm = {
     poNumber: '',
     companyName: '',
     poDate: '',
@@ -224,7 +241,9 @@ const POMonitoring = () => {
     includeTax: true,
     includeEwt: false,
     status: 'pending'
-  });
+  };
+
+  const [form, setForm] = useState(initialForm);
   const [customPrices, setCustomPrices] = useState({});
   const [deliveryMinDate, setDeliveryMinDate] = useState(new Date().toISOString().split('T')[0]);
   const [phoneError, setPhoneError] = useState('');
@@ -252,12 +271,29 @@ const POMonitoring = () => {
     status: 'pending'
   });
 
+  // Helpers to reset / open / close the Add PO form so inputs don't persist after cancel
+  const resetForm = useCallback(() => {
+    setForm(initialForm);
+    setCustomPrices({});
+    setPhoneError('');
+    setDeliveryDateError('');
+  }, [setForm, setCustomPrices]);
+
+  const openNewForm = useCallback(() => {
+    resetForm();
+    setShowForm(true);
+  }, [resetForm]);
+
+  const closeForm = useCallback(() => {
+    resetForm();
+    setShowForm(false);
+  }, [resetForm]);
+
   // Forecasting section state
   const [forecastingDate, setForecastingDate] = useState('');
   const [forecastingVehicles, setForecastingVehicles] = useState([]);
 
-  // Function to simulate vehicle loading for Pending POs on selected date
-  // (Pending POs include those with delivery dates that are not the earliest)
+  // Function to simulate vehicle loading for On-Hold POs on selected date
   const simulateForecasting = useCallback((selectedDate) => {
     if (!selectedDate) {
       // Show all vehicles with zero load when no date selected
@@ -271,9 +307,9 @@ const POMonitoring = () => {
       return;
     }
 
-    // Get all Pending POs with the selected delivery date
-    const pendingPOsForDate = pos.filter(po =>
-      po.status === 'pending' && po.deliveryDate === selectedDate
+    // Get all On-Hold POs with the selected delivery date
+    const onHoldPOsForDate = pos.filter(po =>
+      po.status === 'on-hold' && po.deliveryDate === selectedDate
     );
 
     // Create a copy of vehicles for simulation (all vehicles are available for forecasting)
@@ -287,14 +323,14 @@ const POMonitoring = () => {
       simulatedPOs: []
     }));
 
-    if (pendingPOsForDate.length === 0) {
+    if (onHoldPOsForDate.length === 0) {
       // No POs for this date, show all vehicles with zero load
       setForecastingVehicles(simulationVehicles);
       return;
     }
 
     // Sort POs by load size (largest first for better packing)
-  const sortedPOs = [...pendingPOsForDate].sort((a, b) => {
+    const sortedPOs = [...onHoldPOsForDate].sort((a, b) => {
       const loadA = a.products.reduce((total, item) => {
         const product = products[item.product];
         if (!product) return total;
@@ -335,7 +371,7 @@ const POMonitoring = () => {
     });
 
     // Simulate assignment using load balancing logic with clustering rules
-  for (const po of sortedPOs) {
+    for (const po of sortedPOs) {
       const load = po.products.reduce((total, item) => {
         const product = products[item.product];
         if (!product) return total;
@@ -1155,165 +1191,47 @@ const POMonitoring = () => {
     }
 
     try {
-      // Build the updated PO and compute load
+      if (!selectedPO || !selectedPO.id) {
+        setNotification({
+          type: 'error',
+          title: 'Update failed',
+          message: 'No purchase order selected for update.'
+        });
+        return;
+      }
+
+      // Explicit mapping of editable fields to avoid accidental keys
       const updatedPO = {
         customId: editForm.poNumber,
-        ...editForm,
+        companyName: editForm.companyName,
+        poDate: editForm.poDate,
+        cluster: editForm.cluster || '',
+        location: editForm.location || '',
+        deliveryDate: editForm.deliveryDate || '',
+        products: editForm.products || [],
+        totalPrice: editForm.totalPrice || 0,
+        address: editForm.address || '',
+        contact: editForm.contact || '',
+        phone: editForm.phone || '',
+        currency: editForm.currency || 'PHP',
+        termsOfPayment: editForm.termsOfPayment || '',
+        status: editForm.status || 'pending',
         load: calculateLoad(editForm),
         updatedAt: new Date()
-        // Note: status will be computed below according to earliest-date rule
       };
 
-      // Determine status and whether to attempt assignment using the same
-      // earliest-date logic used when creating POs.
-      let initialStatus = 'pending';
-      let shouldAssign = false;
+      console.log('Updating PO:', selectedPO.id, updatedPO);
 
-      const deliveryDateChanged = updatedPO.deliveryDate !== selectedPO.deliveryDate;
+      await updateDoc(doc(db, 'pos', selectedPO.id), updatedPO);
 
-      if (!updatedPO.deliveryDate) {
-        // No delivery date → on-hold
-        initialStatus = 'on-hold';
-        shouldAssign = false;
-      } else {
-        // Collect existing delivery dates (exclude completed POs and the PO being edited)
-        const existingDeliveryDates = new Set();
-        pos.forEach(po => {
-          if (po.id === selectedPO.id) return; // exclude the PO being edited
-          if (po.deliveryDate && po.status !== 'completed') {
-            existingDeliveryDates.add(po.deliveryDate);
-          }
-        });
-
-        // Include the edited PO's delivery date in the earliest calculation
-        existingDeliveryDates.add(updatedPO.deliveryDate);
-
-        const sortedDates = Array.from(existingDeliveryDates).sort();
-        const earliestDate = sortedDates.length > 0 ? sortedDates[0] : null;
-
-        if (updatedPO.deliveryDate && updatedPO.deliveryDate === earliestDate) {
-          shouldAssign = true;
-          initialStatus = 'pending'; // will be set to 'assigned' if assignment succeeds
-        } else {
-          shouldAssign = false;
-          // Preserve assigned status if the PO was already assigned and the delivery date didn't change
-          if (!deliveryDateChanged && selectedPO.status === 'assigned') {
-            initialStatus = 'assigned';
-          } else {
-            initialStatus = 'pending';
-          }
-        }
-      }
-
-      // Apply initial status and clean undefined values before writing
-      updatedPO.status = initialStatus;
-
-      const cleanedBasePayload = Object.fromEntries(
-        Object.entries(updatedPO).filter(([, v]) => typeof v !== 'undefined')
-      );
-
-  // Persist the edited PO base fields (including computed load and initial status)
-  await updateDoc(doc(db, 'pos', selectedPO.id), cleanedBasePayload);
-
-      // If eligible, attempt assignment now
-      if (shouldAssign) {
-  const assignmentResult = assignVehicleAutomatically({ ...updatedPO, id: selectedPO.id });
-
-        if (assignmentResult === 'on-hold') {
-          await updateDoc(doc(db, 'pos', selectedPO.id), { status: 'on-hold' });
-          // Log on-hold
-          await addDoc(collection(db, 'history'), {
-            timestamp: new Date(),
-            action: 'PO Placed On Hold (Date Balancing - Edit)',
-            details: `PO ${updatedPO.customId} placed on hold due to date-based balancing rules (edit)`
-          });
-        } else if (assignmentResult) {
-          // Assigned successfully
-          await updateDoc(doc(db, 'pos', selectedPO.id), { assignedTruck: assignmentResult, status: 'assigned', load: updatedPO.load });
-          // Log assignment
-          await addDoc(collection(db, 'history'), {
-            timestamp: new Date(),
-            action: 'Auto-Assigned PO to Vehicle (Edit)',
-            details: `PO ${updatedPO.customId} auto-assigned to ${assignmentResult} after edit`
-          });
-
-          // After assignment, attempt a system-wide rebalance
-          try {
-            const posQuery = query(collection(db, 'pos'), orderBy('createdAt'));
-            const querySnapshot = await getDocs(posQuery);
-            const allPOs = [];
-            querySnapshot.forEach((doc) => {
-              allPOs.push({ id: doc.id, customId: doc.data().customId, ...doc.data() });
-            });
-
-            const rebalanceResult = await rebalanceLoads(allPOs);
-            console.log('Auto-rebalance after PO edit assignment:', rebalanceResult);
-          } catch (rebalanceError) {
-            console.error('Auto-rebalance failed after PO edit assignment:', rebalanceError);
-          }
-        } else {
-          // Eligible but no vehicle -> on-hold
-          await updateDoc(doc(db, 'pos', selectedPO.id), { status: 'on-hold', load: updatedPO.load });
-
-          // Provide helpful notification similar to create flow
-          const clusterName = updatedPO.cluster;
-          const allVehiclesForDate = vehicles.filter(v => {
-            const usedForDate = getUsedLoadForVehicleOnDate(v, updatedPO.deliveryDate);
-            const hasCapacity = (v.capacity - usedForDate) >= updatedPO.load;
-            return v.ready && hasCapacity;
-          });
-          const unavailableDrivers = allVehiclesForDate.filter(v => v.status !== 'Available');
-          const availableVehicles = allVehiclesForDate.filter(v => v.status === 'Available');
-
-          if (unavailableDrivers.length > 0 && availableVehicles.length === 0) {
-            setNotification({
-              type: 'warning',
-              title: 'PO Placed On Hold',
-              message: `No suitable vehicles available. All vehicles have drivers with unavailable status: ${unavailableDrivers.map(v => `${v.name} (${v.status})`).join(', ')}. The PO has been placed on hold for now.`
-            });
-          } else if (availableVehicles.length === 0) {
-            setNotification({
-              type: 'warning',
-              title: 'PO Placed On Hold',
-              message: `No suitable vehicles available for this delivery date. The PO has been placed on hold and will be assigned when vehicles become available.`
-            });
-          } else {
-            setNotification({
-              type: 'warning',
-              title: 'PO Placed On Hold',
-              message: 'No suitable vehicle is available for this PO at this time. The PO has been placed on hold and will be automatically assigned when a suitable vehicle becomes available.'
-            });
-          }
-
-          await addDoc(collection(db, 'history'), {
-            timestamp: new Date(),
-            action: 'PO Placed On Hold (Edit)',
-            details: `PO ${updatedPO.customId} placed on hold after edit - no available vehicles`
-          });
-        }
-      } else {
-        // Not eligible for assignment
-        if (initialStatus === 'on-hold') {
-          // Preserve on-hold
-          await updateDoc(doc(db, 'pos', selectedPO.id), { status: 'on-hold', load: updatedPO.load });
-        } else if (!deliveryDateChanged && selectedPO.status === 'assigned') {
-          // Preserve existing assignment if delivery date didn't change
-          // Only update the load (and leave assignedTruck/status intact)
-          await updateDoc(doc(db, 'pos', selectedPO.id), { load: updatedPO.load });
-        } else {
-          // Default: set to pending
-          await updateDoc(doc(db, 'pos', selectedPO.id), { status: 'pending', load: updatedPO.load });
-        }
-      }
-
-      // Log the update action
+      // Log the update
       await addDoc(collection(db, 'history'), {
         timestamp: new Date(),
         action: 'Updated PO',
         details: `PO ${selectedPO.customId} was updated`
       });
 
-      // Final system-wide rebalance to ensure global constraints
+      // After PO update, enforce system-wide date rules using rebalance
       try {
         const posQuery = query(collection(db, 'pos'), orderBy('createdAt'));
         const querySnapshot = await getDocs(posQuery);
@@ -1344,7 +1262,7 @@ const POMonitoring = () => {
       setNotification({
         type: 'error',
         title: 'Update Failed',
-        message: 'Failed to update PO. Please try again.'
+        message: `Failed to update PO. ${error?.message || ''}`
       });
     }
   };
@@ -1774,29 +1692,26 @@ const POMonitoring = () => {
       // if this PO's delivery date is the earliest overall. This makes the system follow the
       // earliest-date rule (not real-time) described in the requirements.
       let assignmentResult = null;
-      // Compute earliestDate and whether this PO would be eligible for immediate assignment
-      const existingDeliveryDates = new Set();
-      pos.forEach(po => {
-        if (po.deliveryDate && po.status !== 'completed') {
-          existingDeliveryDates.add(po.deliveryDate);
-        }
-      });
-      // If new PO has a delivery date, include it for earliest calculation
-      if (newPO.deliveryDate) existingDeliveryDates.add(newPO.deliveryDate);
-      const sortedDates = Array.from(existingDeliveryDates).sort();
-      const earliestDate = sortedDates.length > 0 ? sortedDates[0] : null;
-      const wasEligible = newPO.deliveryDate && newPO.deliveryDate === earliestDate;
-
       if (!newPO.deliveryDate) {
         // No delivery date → on-hold
         await updateDoc(docRef, { status: 'on-hold', load: newPO.load });
         newPO.status = 'on-hold';
       } else {
-        if (wasEligible) {
+        const existingDeliveryDates = new Set();
+        pos.forEach(po => {
+          if (po.deliveryDate && po.status !== 'completed') {
+            existingDeliveryDates.add(po.deliveryDate);
+          }
+        });
+        existingDeliveryDates.add(newPO.deliveryDate);
+        const sortedDates = Array.from(existingDeliveryDates).sort();
+        const earliestDate = sortedDates.length > 0 ? sortedDates[0] : null;
+
+        if (newPO.deliveryDate === earliestDate) {
           // Eligible for assignment
           assignmentResult = assignVehicleAutomatically({ ...newPO, id: poId });
         } else {
-          // Not the earliest date → remain pending (assignmentResult stays null)
+          // Not the earliest date → remain pending
           assignmentResult = null;
         }
       }
@@ -1828,67 +1743,50 @@ const POMonitoring = () => {
           details: `PO ${newPO.customId} auto-assigned to ${assignmentResult}`
         });
       } else {
-        // assignmentResult is falsy. Distinguish why:
-        // - If PO has no delivery date -> on-hold (already handled above, but double-check)
-        // - If PO was eligible for assignment (earliest date) but no vehicles available -> on-hold
-        // - If PO is NOT the earliest date -> remain pending
-        if (!newPO.deliveryDate) {
-          await updateDoc(docRef, { status: 'on-hold', load: newPO.load });
-          newPO.status = 'on-hold';
+        // Set status to on-hold when no vehicle is available
+        await updateDoc(docRef, { status: 'on-hold', load: newPO.load });
+        newPO.status = 'on-hold';
+
+        // Check if the issue is driver status or capacity availability
+        const clusterName = newPO.cluster;
+        const allVehiclesForDate = vehicles.filter(v => {
+          const usedForDate = getUsedLoadForVehicleOnDate(v, newPO.deliveryDate);
+          const hasCapacity = (v.capacity - usedForDate) >= newPO.load;
+          return v.ready && hasCapacity;
+        });
+
+        const unavailableDrivers = allVehiclesForDate.filter(v => v.status !== 'Available');
+        const availableVehicles = allVehiclesForDate.filter(v => v.status === 'Available');
+
+        if (unavailableDrivers.length > 0 && availableVehicles.length === 0) {
+          setNotification({
+            type: 'warning',
+            title: 'PO Placed On Hold',
+            message: `No suitable vehicles available in cluster ${clusterName}. All vehicles have drivers with status: ${unavailableDrivers.map(v => `${v.name} (${v.status})`).join(', ')}. Please check driver statuses or wait for drivers to become available. PO has been placed on hold.`,
+            showCloseButton: true
+          });
+        } else if (availableVehicles.length === 0) {
+          setNotification({
+            type: 'warning',
+            title: 'PO Placed On Hold',
+            message: `No suitable vehicles available in cluster ${clusterName} for this PO on the selected delivery date. Vehicles may be full or restricted to another cluster. PO has been placed on hold.`,
+            showCloseButton: true
+          });
         } else {
-          // earliestDate is computed earlier in this scope; check if this PO was eligible
-          const wasEligible = newPO.deliveryDate === earliestDate;
-          if (wasEligible) {
-            // Eligible but no vehicle available -> on-hold
-            await updateDoc(docRef, { status: 'on-hold', load: newPO.load });
-            newPO.status = 'on-hold';
-
-            // Check for driver/capacity reasons to surface a helpful notification
-            const clusterName = newPO.cluster;
-            const allVehiclesForDate = vehicles.filter(v => {
-              const usedForDate = getUsedLoadForVehicleOnDate(v, newPO.deliveryDate);
-              const hasCapacity = (v.capacity - usedForDate) >= newPO.load;
-              return v.ready && hasCapacity;
-            });
-
-            const unavailableDrivers = allVehiclesForDate.filter(v => v.status !== 'Available');
-            const availableVehicles = allVehiclesForDate.filter(v => v.status === 'Available');
-
-            if (unavailableDrivers.length > 0 && availableVehicles.length === 0) {
-              setNotification({
-                type: 'warning',
-                title: 'PO Placed On Hold',
-                message: `No suitable vehicles available in cluster ${clusterName}. All vehicles have drivers with status: ${unavailableDrivers.map(v => `${v.name} (${v.status})`).join(', ')}. Please check driver statuses or wait for drivers to become available. PO has been placed on hold.`,
-                showCloseButton: true
-              });
-            } else if (availableVehicles.length === 0) {
-              setNotification({
-                type: 'warning',
-                title: 'PO Placed On Hold',
-                message: `No suitable vehicles available in cluster ${clusterName} for this PO on the selected delivery date. Vehicles may be full or restricted to another cluster. PO has been placed on hold.`,
-                showCloseButton: true
-              });
-            } else {
-              setNotification({
-                type: 'warning',
-                title: 'PO Placed On Hold',
-                message: 'No suitable vehicle available for this PO. PO has been placed on hold.',
-                showCloseButton: true
-              });
-            }
-
-            // Log on-hold status
-            await addDoc(collection(db, 'history'), {
-              timestamp: new Date(),
-              action: 'PO Placed On Hold',
-              details: `PO ${newPO.customId} placed on hold - no available vehicles in cluster ${clusterName}`
-            });
-          } else {
-            // Not earliest date -> remain pending
-            await updateDoc(docRef, { status: 'pending', load: newPO.load });
-            newPO.status = 'pending';
-          }
+          setNotification({
+            type: 'warning',
+            title: 'PO Placed On Hold',
+            message: 'No suitable vehicle available for this PO. PO has been placed on hold.',
+            showCloseButton: true
+          });
         }
+
+        // Log on-hold status
+        await addDoc(collection(db, 'history'), {
+          timestamp: new Date(),
+          action: 'PO Placed On Hold',
+          details: `PO ${newPO.customId} placed on hold - no available vehicles in cluster ${clusterName}`
+        });
       }
 
       setForm({
@@ -1919,7 +1817,7 @@ const POMonitoring = () => {
       setNotification({
         type: 'success',
         title: 'Purchase Order Created',
-        message: `PO ${newPO.customId} has been successfully created and ${newPO.status === 'assigned' ? `automatically assigned to ${newPO.assignedTruck}` : newPO.status === 'on-hold' ? 'placed on hold due to scheduling rules' : newPO.status === 'pending' ? 'created as pending (awaiting assignment)' : `set to status ${newPO.status}`}. You can monitor its progress in the PO list.`,
+        message: `PO ${newPO.customId} has been successfully created and ${newPO.status === 'assigned' ? `automatically assigned to ${newPO.assignedTruck}` : newPO.status === 'on-hold' ? 'placed on hold due to scheduling rules' : 'placed on hold pending vehicle assignment'}. You can monitor its progress in the PO list.`,
         autoClose: true,
         autoCloseDelay: 5000,
         showCloseButton: false
@@ -1949,7 +1847,7 @@ const POMonitoring = () => {
       companyName: selectedPO.companyName,
       poDate: selectedPO.poDate,
       cluster: selectedPO.cluster || '',
-  location: selectedPO.location || '',
+      location: selectedPO.location,
       deliveryDate: selectedPO.deliveryDate,
       products: [...selectedPO.products],
       totalPrice: selectedPO.totalPrice,
@@ -1958,9 +1856,7 @@ const POMonitoring = () => {
       phone: selectedPO.phone || '',
       currency: selectedPO.currency || 'PHP',
       termsOfPayment: selectedPO.termsOfPayment || '',
-      status: selectedPO.status || 'pending',
-      includeTax: typeof selectedPO.includeTax !== 'undefined' ? selectedPO.includeTax : true,
-      includeEwt: typeof selectedPO.includeEwt !== 'undefined' ? selectedPO.includeEwt : false
+      status: selectedPO.status || 'pending'
     });
     setIsEditing(true);
   };
@@ -2156,7 +2052,7 @@ const POMonitoring = () => {
     <div className="po-monitoring">
       <h1>PO Monitoring</h1>
       <div className="header-actions">
-        <button className="add-po-btn" onClick={() => setShowForm(true)}>+ Add PO</button>
+        <button className="add-po-btn" onClick={openNewForm}>+ Add PO</button>
         <button className="rebalance-btn" onClick={handleRebalanceLoads}>Rebalance Loads</button>
       </div>
       {showForm && (
@@ -2164,7 +2060,7 @@ const POMonitoring = () => {
           <div className="modal-content kiosk-modal">
             <div className="kiosk-header">
               <h2>New Purchase Order</h2>
-              <button className="close-btn" onClick={() => setShowForm(false)}>×</button>
+              <button className="close-btn" onClick={closeForm}>×</button>
             </div>
 
             <div className="kiosk-form">
@@ -2234,7 +2130,11 @@ const POMonitoring = () => {
                         <span className="checkbox-text">
                           Include Sales Tax (12%)
                         </span>
-                        {/* show only the checkbox; no enabled text */}
+                        {form.includeTax && (
+                          <span className="tax-status enabled">
+                            ✓ Enabled
+                          </span>
+                        )}
                       </label>
                     </div>
                     <div className="checkbox-group">
@@ -2248,7 +2148,11 @@ const POMonitoring = () => {
                         <span className="checkbox-text">
                           Include EWT (1%)
                         </span>
-                        {/* show only the checkbox; no enabled text */}
+                        {form.includeEwt && (
+                          <span className="tax-status enabled">
+                            ✓ Enabled
+                          </span>
+                        )}
                       </label>
                     </div>
                   </div>
@@ -2611,7 +2515,7 @@ const POMonitoring = () => {
               </div>
 
               <div className="kiosk-actions">
-                <button type="button" className="cancel-btn" onClick={() => setShowForm(false)}>Cancel</button>
+                <button type="button" className="cancel-btn" onClick={closeForm}>Cancel</button>
                 <button
                   type="submit"
                   className={`submit-btn ${areRequiredFieldsFilled() && form.products.length > 0 ? 'ready' : ''}`}
@@ -2717,8 +2621,9 @@ const POMonitoring = () => {
               <option value="">Select a delivery date...</option>
               {[...new Set(
                 pos
-                  .filter(po => po.status === 'pending' && po.deliveryDate)
+                  .filter(po => po.status === 'on-hold')
                   .map(po => po.deliveryDate)
+                  .filter(date => date) // Remove any null/undefined dates
               )]
                 .sort() // Sort dates chronologically
                 .map(date => (
@@ -2852,30 +2757,6 @@ const POMonitoring = () => {
                       <label>Terms of Payment</label>
                       <input name="termsOfPayment" placeholder="e.g., Net 30 days" value={editForm.termsOfPayment} onChange={handleEditInputChange} />
                     </div>
-                    <div className="input-group tax-toggles">
-                      <div className="checkbox-group">
-                        <label className="checkbox-label">
-                          <input
-                            type="checkbox"
-                            name="includeTax"
-                            checked={!!editForm.includeTax}
-                            onChange={(e) => setEditForm({ ...editForm, includeTax: e.target.checked })}
-                          />
-                          <span className="checkbox-text">Include Sales Tax (12%)</span>
-                        </label>
-                      </div>
-                      <div className="checkbox-group">
-                        <label className="checkbox-label">
-                          <input
-                            type="checkbox"
-                            name="includeEwt"
-                            checked={!!editForm.includeEwt}
-                            onChange={(e) => setEditForm({ ...editForm, includeEwt: e.target.checked })}
-                          />
-                          <span className="checkbox-text">Include EWT (1%)</span>
-                        </label>
-                      </div>
-                    </div>
                   </div>
                 </div>
 
@@ -2993,25 +2874,13 @@ const POMonitoring = () => {
                         <span>Subtotal:</span>
                         <span>₱{editForm.totalPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                       </div>
-                      {editForm.includeTax && (
-                        <div className="total-row">
-                          <span>Sales Tax (12%):</span>
-                          <span>₱{(editForm.totalPrice * 0.12).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                        </div>
-                      )}
-                      {editForm.includeEwt && (
-                        <div className="total-row">
-                          <span>EWT (1%):</span>
-                          <span>-₱{(editForm.totalPrice * 0.01).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                        </div>
-                      )}
+                      <div className="total-row">
+                        <span>Sales Tax (12%):</span>
+                        <span>₱{(editForm.totalPrice * 0.12).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      </div>
                       <div className="total-row final-total">
                         <span>Total:</span>
-                        <span>₱{(
-                          editForm.totalPrice
-                          + (editForm.includeTax ? editForm.totalPrice * 0.12 : 0)
-                          - (editForm.includeEwt ? editForm.totalPrice * 0.01 : 0)
-                        ).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        <span>₱{(editForm.totalPrice * 1.12).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                       </div>
                     </div>
                   </div>
@@ -3116,22 +2985,11 @@ const POMonitoring = () => {
               <div className="summary-left">
                 <p><strong>Currency:</strong> {selectedPO.currency || 'PHP'}</p>
                 <p><strong>Terms of payment:</strong> {selectedPO.termsOfPayment || 'Not specified'}</p>
-                <p><strong>Include Sales Tax:</strong> {selectedPO.includeTax ? 'Yes' : 'No'}</p>
-                <p><strong>Include EWT:</strong> {selectedPO.includeEwt ? 'Yes' : 'No'}</p>
               </div>
               <div className="summary-right">
                 <p><strong>Subtotal:</strong> ₱{selectedPO.totalPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                {selectedPO.includeTax && (
-                  <p><strong>Sales tax (12%):</strong> ₱{(selectedPO.totalPrice * 0.12).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                )}
-                {selectedPO.includeEwt && (
-                  <p><strong>EWT (1%):</strong> -₱{(selectedPO.totalPrice * 0.01).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                )}
-                <p><strong>Total amount:</strong> ₱{(
-                  selectedPO.totalPrice
-                  + (selectedPO.includeTax ? selectedPO.totalPrice * 0.12 : 0)
-                  - (selectedPO.includeEwt ? selectedPO.totalPrice * 0.01 : 0)
-                ).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                <p><strong>Sales tax (12%):</strong> ₱{(selectedPO.totalPrice * 0.12).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                <p><strong>Total amount:</strong> ₱{(selectedPO.totalPrice * 1.12).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
               </div>
             </div>
 

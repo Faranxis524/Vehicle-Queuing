@@ -6,6 +6,11 @@ const VehicleContext = createContext();
 
 export const useVehicles = () => useContext(VehicleContext);
 
+// Units used throughout this file:
+// - vehicle.capacity and product packaging / piece sizes are expressed in cubic centimeters (cm³).
+// - product and vehicle dimensions (length/width/height) are expressed in millimeters (mm).
+// Keep these units consistent when updating product data or vehicle capacities.
+
 const initialVehicles = [
   {
     id: 'isuzu-flexy-small',
@@ -100,14 +105,26 @@ const calculateLoad = (po) => {
     if (item.pricingType === 'perPackage') {
       if (Array.isArray(product.packaging)) {
         const selectedPackaging = product.packaging.find(p => p.quantity === item.packageQuantity) || product.packaging[0];
-        itemSize = selectedPackaging.size;
+        if (!selectedPackaging) {
+          console.warn(`Packaging lookup failed for product=${item.product} packageQuantity=${item.packageQuantity}. Falling back to first packaging option.`);
+        }
+        // If the packaging entries do not include a 'quantity' field, the find above
+        // will always fall back to the first item; ensure packaging objects include
+        // a 'quantity' property or change the lookup accordingly.
+        itemSize = selectedPackaging ? selectedPackaging.size : 0;
       } else {
         itemSize = product.packaging.size;
       }
     } else if (item.pricingType === 'perPiece') {
       itemSize = product.pieceSize || 0;
     }
-    return total + (item.quantity * itemSize);
+    const added = item.quantity * itemSize;
+    // Quick heuristic: if itemSize looks like cm^3 (<= 1e7) but vehicle capacity is in a very different scale,
+    // log a warning for developers to verify units.
+    if (added > 0 && added < 1 && total === 0) {
+      // no-op: keep for future checks (placeholder)
+    }
+    return total + added;
   }, 0);
 };
 
@@ -146,7 +163,10 @@ const checkDimensionsFit = (po, vehicle) => {
     if (item.pricingType === 'perPackage') {
       if (Array.isArray(product.packaging)) {
         const selectedPackaging = product.packaging.find(p => p.quantity === item.packageQuantity) || product.packaging[0];
-        dimensions = selectedPackaging.dimensions;
+        if (!selectedPackaging) {
+          console.warn(`Packaging lookup (dimensions) failed for product=${item.product} packageQuantity=${item.packageQuantity}. Falling back to first packaging dimensions.`);
+        }
+        dimensions = selectedPackaging ? selectedPackaging.dimensions : null;
       } else {
         dimensions = product.packaging.dimensions;
       }
