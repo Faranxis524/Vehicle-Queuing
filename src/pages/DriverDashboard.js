@@ -418,18 +418,18 @@ const DriverDashboard = () => {
       }
 
       // Enhanced audit trail with more context
-      await addDoc(collection(db, 'history'), {
-        timestamp: new Date(),
-        action: newStatus === 'done' ? 'PO Marked as Delivered (Awaiting Admin Confirmation)' : 'Delivery Status Updated',
-        details: `PO ${po.customId} delivery status changed from '${po.deliveryStatus}' to '${newStatus}' by driver ${loggedInDriver.name}`,
-        poId: poId,
-        driver: loggedInDriver.name,
-        vehicle: loggedInDriver.vehicle,
-        location: po.location,
-        previousStatus: po.deliveryStatus,
-        newStatus: newStatus,
-        hasPhoto: !!po.deliveryPhoto
-      });
+        await addDoc(collection(db, 'history'), {
+          timestamp: new Date(),
+          action: newStatus === 'done' ? 'PO Marked as Delivered (Awaiting Admin Confirmation)' : 'Delivery Status Updated',
+          details: `PO ${po.customId} delivery status changed from '${po.deliveryStatus}' to '${newStatus}' by driver ${loggedInDriver.name}`,
+          poId: poId,
+          driver: loggedInDriver.name,
+          vehicle: loggedInDriver.vehicle,
+          location: po.location ?? null,
+          previousStatus: po.deliveryStatus,
+          newStatus: newStatus,
+          hasPhoto: !!po.deliveryPhoto
+        });
 
       // Success feedback
       setNotification({
