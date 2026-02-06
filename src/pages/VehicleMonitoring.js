@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useVehicles } from '../contexts/VehicleContext';
+import { PRODUCTS_CATALOG } from '../data/productsCatalog';
 import './VehicleMonitoring.css';
 
 const VehicleMonitoring = () => {
@@ -237,42 +238,7 @@ const VehicleMonitoring = () => {
                 </thead>
                 <tbody>
                   {selectedPO.products.map((item, index) => {
-                    const product = {
-                      'Interfolded': {
-                        packaging: { type: 'case', quantity: 30 },
-                        pricing: {
-                          perPiece: { price: 26, unit: 'piece' },
-                          perPackage: { price: 780, unit: 'case' }
-                        }
-                      },
-                      'Jumbo Roll': {
-                        packaging: [
-                          { type: 'case', quantity: 12 },
-                          { type: 'case', quantity: 16 }
-                        ],
-                        pricing: {
-                          perPiece: { price: 51, unit: 'roll' },
-                          perPackage: [
-                            { price: 612, unit: 'case', quantity: 12 },
-                            { price: 816, unit: 'case', quantity: 16 }
-                          ]
-                        }
-                      },
-                      'Bathroom': {
-                        packaging: { type: 'bundle', quantity: 48 },
-                        pricing: {
-                          perPiece: { price: 8.15, unit: 'roll' },
-                          perPackage: { price: 408, unit: 'bundle' }
-                        }
-                      },
-                      'Hand Roll': {
-                        packaging: { type: 'bundle', quantity: 6 },
-                        pricing: {
-                          perPiece: { price: 134, unit: 'roll' },
-                          perPackage: { price: 804, unit: 'bundle' }
-                        }
-                      }
-                    }[item.product];
+                    const product = PRODUCTS_CATALOG[item.product];
 
                     let price = 0;
                     let unit = 'PCS';

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useMemo, useState } from 'react';
 import { doc, updateDoc, addDoc, collection, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
+import { PRODUCTS_CATALOG } from '../data/productsCatalog';
 
 const VehicleContext = createContext();
 
@@ -71,31 +72,7 @@ const clusters = {
 
 // Helper function to calculate load from PO products
 const calculateLoad = (po) => {
-  const products = {
-    'Interfolded': {
-      packaging: { size: 70780.5 },
-      dimensions: { length: 535, width: 315, height: 420 }, // mm per case (53.5 x 31.5 x 42 cm)
-      pieceSize: 2000 // cm³ per piece (Interfolded Paper Towel piece/roll volume)
-    },
-    'Jumbo Roll': {
-      packaging: [
-        { quantity: 12, size: 39016.5, dimensions: { length: 370, width: 285, height: 370 } }, // 12 rolls case (37 × 28.5 × 37 cm)
-        { quantity: 16, size: 90956.25, dimensions: { length: 495, width: 375, height: 490 } }  // 16 rolls case (49.5 × 37.5 × 49 cm)
-      ],
-      dimensions: { length: 400, width: 300, height: 200 }, // mm per roll (estimated)
-      pieceSize: 3648.4 // cm³ per roll (Jumbo Roll Tissue piece/roll volume)
-    },
-    'Bathroom': {
-      packaging: { size: 45630, dimensions: { length: 585, width: 390, height: 200 } }, // mm per case (58.5 x 39 x 20 cm)
-      dimensions: { length: 250, width: 180, height: 120 }, // mm per bundle (estimated)
-      pieceSize: 926.7 // cm³ per roll (Bathroom Tissue piece/roll volume)
-    },
-    'Hand Roll': {
-      packaging: { size: 46200, dimensions: { length: 550, width: 400, height: 210 } }, // mm per case (55 x 40 x 21 cm)
-      dimensions: { length: 200, width: 150, height: 100 }, // mm per bundle (estimated)
-      pieceSize: 6813.6 // cm³ per roll (Hand Roll Tissue piece/roll volume)
-    }
-  };
+  const products = PRODUCTS_CATALOG;
 
   return po.products.reduce((total, item) => {
     const product = products[item.product];
@@ -116,7 +93,7 @@ const calculateLoad = (po) => {
         itemSize = product.packaging.size;
       }
     } else if (item.pricingType === 'perPiece') {
-      itemSize = product.pieceSize || 0;
+        itemSize = product.pieceSize || 0;
     }
     const added = item.quantity * itemSize;
     // Quick heuristic: if itemSize looks like cm^3 (<= 1e7) but vehicle capacity is in a very different scale,
@@ -130,27 +107,7 @@ const calculateLoad = (po) => {
 
 // Helper function to check if PO dimensions fit in vehicle
 const checkDimensionsFit = (po, vehicle) => {
-  const products = {
-    'Interfolded': {
-      packaging: { size: 70780.5 },
-      dimensions: { length: 535, width: 315, height: 420 } // mm per case (53.5 x 31.5 x 42 cm)
-    },
-    'Jumbo Roll': {
-      packaging: [
-        { size: 39016.5, dimensions: { length: 370, width: 285, height: 370 } }, // 12 rolls case (37 × 28.5 × 37 cm)
-        { size: 90956.25, dimensions: { length: 495, width: 375, height: 490 } }  // 16 rolls case (49.5 × 37.5 × 49 cm)
-      ],
-      dimensions: { length: 400, width: 300, height: 200 } // mm per roll (estimated)
-    },
-    'Bathroom': {
-      packaging: { size: 45630, dimensions: { length: 585, width: 390, height: 200 } }, // mm per case (58.5 x 39 x 20 cm)
-      dimensions: { length: 250, width: 180, height: 120 } // mm per bundle (estimated)
-    },
-    'Hand Roll': {
-      packaging: { size: 46200, dimensions: { length: 550, width: 400, height: 210 } }, // mm per case (55 x 40 x 21 cm)
-      dimensions: { length: 200, width: 150, height: 100 } // mm per bundle (estimated)
-    }
-  };
+  const products = PRODUCTS_CATALOG;
 
   // Calculate maximum dimensions needed for this PO
   let maxLength = 0, maxWidth = 0, maxHeight = 0;
@@ -738,10 +695,11 @@ export const VehicleProvider = ({ children }) => {
           status: 'assigned'
         });
         
+        const vehicleCapacity = workingVehicles.find(v => v.name === assignment.vehicle)?.capacity || 0;
         await addDoc(collection(db, 'history'), {
           timestamp: new Date(),
           action: 'Rebalanced PO Assignment',
-          details: `PO ${assignment.po.customId} assigned to ${assignment.vehicle} (${(assignment.utilization * 100).toFixed(1)}% utilization)`
+          details: `PO ${assignment.po.customId} assigned to ${assignment.vehicle} (${(assignment.utilization * 100).toFixed(1)}% utilization) • Load ${calculateLoad(assignment.po).toLocaleString()} cm³ / Capacity ${vehicleCapacity.toLocaleString()} cm³`
         });
       }
       

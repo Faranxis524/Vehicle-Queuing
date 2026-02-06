@@ -55,6 +55,7 @@
   z-index: 10;
 }
 
+
 /* Responsive styles for mobile */
 @media (max-width: 768px) {
   .header-actions {
@@ -62,6 +63,7 @@
     align-items: stretch;
     gap: 10px;
   }
+
 
   .add-po-btn,
   .rebalance-btn {

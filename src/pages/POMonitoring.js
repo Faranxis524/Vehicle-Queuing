@@ -5,49 +5,11 @@ import { useVehicles } from '../contexts/VehicleContext';
 import NotificationDialog from '../components/NotificationDialog';
 import ConfirmDialog from '../components/ConfirmDialog';
 import POFormModal from '../components/POFormModal';
+import { PRODUCTS_CATALOG } from '../data/productsCatalog';
 import './POMonitoring.css';
 import './VehicleMonitoring.css';
 
-const products = {
-  'Interfolded': {
-    size: 2000, // cm³ per piece (Interfolded Paper Towel piece/roll volume)
-    packaging: { type: 'case', quantity: 30, name: 'Case (30 pcs)', size: 70780.5 },
-    pricing: {
-      perPiece: { price: 26, unit: 'piece' },
-      perPackage: { price: 780, unit: 'case' }
-    }
-  },
-  'Jumbo Roll': {
-    size: 3648.4, // cm³ per roll (Jumbo Roll Tissue piece/roll volume)
-    packaging: [
-      { type: 'case', quantity: 12, name: 'Case (12 rolls)', size: 39016.5 },
-      { type: 'case', quantity: 16, name: 'Case (16 rolls)', size: 90956.25 }
-    ],
-    pricing: {
-      perPiece: { price: 51, unit: 'roll' },
-      perPackage: [
-        { price: 612, unit: 'case', quantity: 12 },
-        { price: 816, unit: 'case', quantity: 16 }
-      ]
-    }
-  },
-  'Bathroom': {
-    size: 926.7, // cm³ per roll (Bathroom Tissue piece/roll volume)
-    packaging: { type: 'case', quantity: 48, name: 'Case (48 rolls)', size: 45630 },
-    pricing: {
-      perPiece: { price: 8.15, unit: 'roll' },
-      perPackage: { price: 408, unit: 'case' }
-    }
-  },
-  'Hand Roll': {
-    size: 6813.6, // cm³ per roll (Hand Roll Tissue piece/roll volume)
-    packaging: { type: 'case', quantity: 6, name: 'Case (6 rolls)', size: 46200 },
-    pricing: {
-      perPiece: { price: 134, unit: 'roll' },
-      perPackage: { price: 804, unit: 'case' }
-    }
-  }
-};
+const products = PRODUCTS_CATALOG;
 
 const clusters = {
   'Cluster 1': { name: 'Cluster 1 - North Luzon' },
@@ -824,27 +786,7 @@ const POMonitoring = () => {
       if (v.status !== 'Available') return false;
 
       // Rule 5: Dimension Compliance - check if PO dimensions fit in vehicle
-      const products = {
-        'Interfolded': {
-          packaging: { size: 70780.5 },
-          dimensions: { length: 535, width: 315, height: 420 } // mm per case (53.5 x 31.5 x 42 cm)
-        },
-        'Jumbo Roll': {
-          packaging: [
-            { size: 39016.5, dimensions: { length: 370, width: 285, height: 370 } }, // 12 rolls case (37 × 28.5 × 37 cm)
-            { size: 90956.25, dimensions: { length: 495, width: 375, height: 490 } }  // 16 rolls case (49.5 × 37.5 × 49 cm)
-          ],
-          dimensions: { length: 400, width: 300, height: 200 } // mm per roll (estimated)
-        },
-        'Bathroom': {
-          packaging: { size: 45630, dimensions: { length: 585, width: 390, height: 200 } }, // mm per case (58.5 x 39 x 20 cm)
-          dimensions: { length: 250, width: 180, height: 120 } // mm per bundle (estimated)
-        },
-        'Hand Roll': {
-          packaging: { size: 46200, dimensions: { length: 550, width: 400, height: 210 } }, // mm per case (55 x 40 x 21 cm)
-          dimensions: { length: 200, width: 150, height: 100 } // mm per bundle (estimated)
-        }
-      };
+      const products = PRODUCTS_CATALOG;
 
       // Calculate maximum dimensions needed for this PO
       let maxLength = 0, maxWidth = 0, maxHeight = 0;
@@ -1498,7 +1440,7 @@ const POMonitoring = () => {
           await addDoc(collection(db, 'history'), {
             timestamp: new Date(),
             action: 'Auto-Assigned PO to Vehicle',
-            details: `PO ${newPO.customId} auto-assigned to ${assignmentResult}`
+            details: `PO ${newPO.customId} auto-assigned to ${assignmentResult} • Load ${newPO.load.toLocaleString()} cm³`
           });
 
           // After successful assignment, enforce system-wide date rules using rebalance
@@ -1681,7 +1623,7 @@ const POMonitoring = () => {
         await addDoc(collection(db, 'history'), {
           timestamp: new Date(),
           action: 'Auto-Assigned PO to Vehicle',
-          details: `PO ${newPO.customId} auto-assigned to ${assignmentResult}`
+          details: `PO ${newPO.customId} auto-assigned to ${assignmentResult} • Load ${newPO.load.toLocaleString()} cm³`
         });
       } else {
         // Set status to on-hold when no vehicle is available
@@ -1781,6 +1723,11 @@ const POMonitoring = () => {
     setIsEditing(false);
     setShowModal(true);
   };
+
+  const getVehicleCapacityByName = useCallback(
+    (vehicleName) => vehicles.find(v => v.name === vehicleName)?.capacity || 0,
+    [vehicles]
+  );
 
   const handleUpdate = async () => {
     const normalizedProducts = (selectedPO.products || []).map((item) => {
@@ -2006,7 +1953,7 @@ const POMonitoring = () => {
         await addDoc(collection(db, 'history'), {
           timestamp: new Date(),
           action: 'Assigned PO to Vehicle',
-          details: `PO ${selectedPO.customId} assigned to ${vehicle.name} (${(utilizationAfter * 100).toFixed(1)}% utilization)`
+          details: `PO ${selectedPO.customId} assigned to ${vehicle.name} (${(utilizationAfter * 100).toFixed(1)}% utilization) • Load ${load.toLocaleString()} cm³ / Capacity ${vehicle.capacity.toLocaleString()} cm³`
         });
       } else {
         setNotification({
@@ -2035,6 +1982,7 @@ const POMonitoring = () => {
           loading={loading}
           onClose={closeForm}
           onSubmit={handleSubmit}
+          vehicles={vehicles}
           productsCatalog={products}
           clustersCatalog={clusters}
           form={form}
@@ -2044,6 +1992,7 @@ const POMonitoring = () => {
           handleInputChange={handleInputChange}
           deliveryMinDate={deliveryMinDate}
           deliveryDateError={deliveryDateError}
+          calculateLoad={calculateLoad}
           calculateTotalPrice={calculateTotalPrice}
           parseCustomPriceInput={parseCustomPriceInput}
           applyCustomPriceToExistingLineItem={applyCustomPriceToExistingLineItem}
@@ -2229,6 +2178,7 @@ const POMonitoring = () => {
                 loading={editLoading}
                 onClose={() => setIsEditing(false)}
                 onSubmit={handleSaveUpdate}
+                vehicles={vehicles}
                 productsCatalog={products}
                 clustersCatalog={clusters}
                 form={editForm}
@@ -2238,6 +2188,7 @@ const POMonitoring = () => {
                 handleInputChange={handleEditInputChange}
                 deliveryMinDate={editDeliveryMinDate}
                 deliveryDateError={editDeliveryDateError}
+                calculateLoad={calculateLoad}
                 calculateTotalPrice={calculateTotalPrice}
                 parseCustomPriceInput={parseCustomPriceInput}
                 applyCustomPriceToExistingLineItem={applyCustomPriceToExistingEditLineItem}
@@ -2346,16 +2297,20 @@ const POMonitoring = () => {
                   <p><strong>Currency:</strong> {selectedPO.currency || 'PHP'}</p>
                   <p><strong>Terms of payment:</strong> {selectedPO.termsOfPayment || 'Not specified'}</p>
                 </div>
-                <div className="summary-right">
-                  <p><strong>Subtotal:</strong> ₱{selectedPO.totalPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                  <p><strong>Sales tax (12%):</strong> ₱{(selectedPO.totalPrice * 0.12).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                  <p><strong>Total amount:</strong> ₱{(selectedPO.totalPrice * 1.12).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                </div>
+              <div className="summary-right">
+                <p><strong>Subtotal:</strong> ₱{selectedPO.totalPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                <p><strong>Sales tax (12%):</strong> ₱{(selectedPO.totalPrice * 0.12).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                <p><strong>Total amount:</strong> ₱{(selectedPO.totalPrice * 1.12).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+              </div>
               </div>
 
               <div className="modal-actions">
                 <p><strong>Status:</strong> {selectedPO.status === 'assigned' ? 'Assigned' : selectedPO.status === 'on-hold' ? 'On Hold' : selectedPO.status === 'unassignable' ? 'Unassignable' : selectedPO.status === 'in-transit' ? 'In-Transit' : selectedPO.status === 'delivered' ? 'Delivered (Awaiting Confirmation)' : 'Pending'}</p>
                 <p><strong>Assigned Vehicle:</strong> {selectedPO.assignedTruck || 'None'}</p>
+                <p><strong>Load:</strong> {calculateLoad(selectedPO).toLocaleString()} cm³</p>
+                {selectedPO.assignedTruck && (
+                  <p><strong>Vehicle Capacity:</strong> {getVehicleCapacityByName(selectedPO.assignedTruck).toLocaleString()} cm³</p>
+                )}
 
                 <div className="action-buttons">
                   {selectedPO.status === 'delivered' && (

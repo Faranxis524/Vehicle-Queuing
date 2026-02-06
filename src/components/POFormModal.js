@@ -9,7 +9,7 @@ import CustomDatePicker from './CustomDatePicker';
  * - customPrices, setCustomPrices
  * - helper callbacks (calculateTotalPrice, parseCustomPriceInput, applyCustomPriceToExistingLineItem)
  */
-  const POFormModal = ({
+const POFormModal = ({
   isOpen,
   variant = 'modal',
   title,
@@ -18,6 +18,7 @@ import CustomDatePicker from './CustomDatePicker';
   loading,
   onClose,
   onSubmit,
+  vehicles = [],
   productsCatalog,
   clustersCatalog,
   form,
@@ -27,6 +28,7 @@ import CustomDatePicker from './CustomDatePicker';
   handleInputChange,
   deliveryMinDate,
   deliveryDateError,
+  calculateLoad,
   calculateTotalPrice,
   parseCustomPriceInput,
   applyCustomPriceToExistingLineItem,
@@ -61,6 +63,10 @@ import CustomDatePicker from './CustomDatePicker';
       (form.products || []).every(p => p.product && p.quantity > 0 && p.pricingType)
     );
   };
+
+  const currentLoad = calculateLoad ? calculateLoad(form) : 0;
+  const maxCapacity = vehicles.length ? Math.max(...vehicles.map(v => v.capacity || 0)) : 0;
+  const fitsAnyVehicle = maxCapacity > 0 && currentLoad > 0 ? currentLoad <= maxCapacity : false;
 
   const content = (
     <>
@@ -574,6 +580,18 @@ import CustomDatePicker from './CustomDatePicker';
                       return total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                     })()}
                   </span>
+                </div>
+                <div className="total-row">
+                  <span>Load:</span>
+                  <span>{currentLoad.toLocaleString()} cm³</span>
+                </div>
+                <div className="total-row">
+                  <span>Fits any vehicle:</span>
+                  <span>{currentLoad > 0 ? (fitsAnyVehicle ? 'Yes' : 'No') : '-'}</span>
+                </div>
+                <div className="total-row">
+                  <span>Max capacity available:</span>
+                  <span>{maxCapacity ? `${maxCapacity.toLocaleString()} cm³` : '-'}</span>
                 </div>
               </div>
             </div>

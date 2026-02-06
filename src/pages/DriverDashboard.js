@@ -3,6 +3,7 @@ import { collection, onSnapshot, query, orderBy, doc, updateDoc, addDoc, getDocs
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db } from '../firebase';
 import { useVehicles } from '../contexts/VehicleContext';
+import { PRODUCTS_CATALOG } from '../data/productsCatalog';
 import NotificationDialog from '../components/NotificationDialog';
 import ConfirmDialog from '../components/ConfirmDialog';
 import logo from '../companyLogo.png';
@@ -41,46 +42,7 @@ const UsersIcon = () => (
   </svg>
 );
 
-const products = {
-  'Interfolded': {
-    size: 70780.5,
-    packaging: { type: 'case', quantity: 30, name: 'Case (30 pcs)' },
-    pricing: {
-      perPiece: { price: 26, unit: 'piece', capacity: 0 },
-      perPackage: { price: 780, unit: 'case' }
-    }
-  },
-  'Jumbo Roll': {
-    size: 39016.5, // Updated to match 12-roll case volume
-    packaging: [
-      { type: 'case', quantity: 12, name: 'Case (12 rolls)' },
-      { type: 'case', quantity: 16, name: 'Case (16 rolls)' }
-    ],
-    pricing: {
-      perPiece: { price: 51, unit: 'roll', capacity: 0 },
-      perPackage: [
-        { price: 612, unit: 'case', quantity: 12 },
-        { price: 816, unit: 'case', quantity: 16 }
-      ]
-    }
-  },
-  'Bathroom': {
-    size: 45630,
-    packaging: { type: 'bundle', quantity: 48, name: 'Bundle (48 rolls)' },
-    pricing: {
-      perPiece: { price: 8.15, unit: 'roll', capacity: 0 },
-      perPackage: { price: 408, unit: 'bundle' }
-    }
-  },
-  'Hand Roll': {
-    size: 46200,
-    packaging: { type: 'bundle', quantity: 6, name: 'Bundle (6 rolls)' },
-    pricing: {
-      perPiece: { price: 134, unit: 'roll', capacity: 0 },
-      perPackage: { price: 804, unit: 'bundle' }
-    }
-  }
-};
+const products = PRODUCTS_CATALOG;
 
 const DriverDashboard = () => {
   const { vehicles, setVehicleReadyByName } = useVehicles();
