@@ -101,7 +101,7 @@ const POMonitoring = () => {
   const [forecastingDate, setForecastingDate] = useState('');
   const [forecastingVehicles, setForecastingVehicles] = useState([]);
 
-  // Function to simulate vehicle loading for On-Hold POs on selected date
+  // Function to simulate vehicle loading for On-Hold + Pending POs on selected date
   const simulateForecasting = useCallback((selectedDate) => {
     if (!selectedDate) {
       // Show all vehicles with zero load when no date selected
@@ -115,9 +115,9 @@ const POMonitoring = () => {
       return;
     }
 
-    // Get all On-Hold POs with the selected delivery date
-    const onHoldPOsForDate = pos.filter(po =>
-      po.status === 'on-hold' && po.deliveryDate === selectedDate
+    // Get all On-Hold + Pending POs with the selected delivery date
+    const forecastablePOsForDate = pos.filter(po =>
+      (po.status === 'on-hold' || po.status === 'pending') && po.deliveryDate === selectedDate
     );
 
     // Create a copy of vehicles for simulation (all vehicles are available for forecasting)
@@ -131,14 +131,14 @@ const POMonitoring = () => {
       simulatedPOs: []
     }));
 
-    if (onHoldPOsForDate.length === 0) {
+    if (forecastablePOsForDate.length === 0) {
       // No POs for this date, show all vehicles with zero load
       setForecastingVehicles(simulationVehicles);
       return;
     }
 
     // Sort POs by load size (largest first for better packing)
-    const sortedPOs = [...onHoldPOsForDate].sort((a, b) => {
+    const sortedPOs = [...forecastablePOsForDate].sort((a, b) => {
       const loadA = a.products.reduce((total, item) => {
         const product = products[item.product];
         if (!product) return total;
@@ -362,10 +362,10 @@ const POMonitoring = () => {
           const driverData = driversData.find(d => d.name === vehicle.driver);
           const newStatus = driverData?.status || 'Not Set';
           const wasAvailable = vehicle.status === 'Available';
-          const isNowUnavailable = newStatus !== 'Available';
+          const shouldReassign = newStatus === 'Unavailable' || newStatus === 'Under Maintenance';
 
-          // If driver status changed from available to unavailable, trigger reassignment
-          if (wasAvailable && isNowUnavailable && vehicle.assignedPOs?.length > 0) {
+          // If driver status changed from available to explicitly unavailable/maintenance, trigger reassignment
+          if (wasAvailable && shouldReassign && vehicle.assignedPOs?.length > 0) {
             // Automatically reassign loads from this vehicle
             setTimeout(() => {
               handleDriverStatusChange(vehicle, pos);
@@ -2090,7 +2090,7 @@ const POMonitoring = () => {
               <option value="">Select a delivery date...</option>
               {[...new Set(
                 pos
-                  .filter(po => po.status === 'on-hold')
+                  .filter(po => po.status === 'on-hold' || po.status === 'pending')
                   .map(po => po.deliveryDate)
                   .filter(date => date) // Remove any null/undefined dates
               )]

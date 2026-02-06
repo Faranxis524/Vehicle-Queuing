@@ -11,6 +11,8 @@ const History = () => {
   const [completedPOs, setCompletedPOs] = useState([]);
   const [selectedPO, setSelectedPO] = useState(null);
   const [companyFilter, setCompanyFilter] = useState('All');
+  const [historySearch, setHistorySearch] = useState('');
+  const [historyActionFilter, setHistoryActionFilter] = useState('All');
 
   useEffect(() => {
     const q = query(collection(db, 'history'), orderBy('timestamp', 'desc'));
@@ -38,6 +40,15 @@ const History = () => {
 
   // Get unique company names for filter dropdown
   const uniqueCompanies = ['All', ...new Set(completedPOs.map(po => po.companyName).filter(Boolean))];
+
+  const uniqueHistoryActions = ['All', ...new Set(history.map(entry => entry.action).filter(Boolean))];
+
+  const filteredHistory = history.filter(entry => {
+    if (historyActionFilter !== 'All' && entry.action !== historyActionFilter) return false;
+    if (!historySearch.trim()) return true;
+    const haystack = `${entry.action || ''} ${entry.details || ''}`.toLowerCase();
+    return haystack.includes(historySearch.trim().toLowerCase());
+  });
 
   // Filter completed POs based on selected company
   const filteredPOs = companyFilter === 'All'
@@ -217,6 +228,28 @@ const History = () => {
       )}
 
       <h2 style={{ marginTop: '40px' }}>Activity History</h2>
+      <div className="filter-section">
+        <label htmlFor="history-search">Search:</label>
+        <input
+          id="history-search"
+          type="text"
+          value={historySearch}
+          onChange={(e) => setHistorySearch(e.target.value)}
+          placeholder="Search action or details"
+          className="company-filter-dropdown"
+        />
+        <label htmlFor="history-action-filter">Action:</label>
+        <select
+          id="history-action-filter"
+          value={historyActionFilter}
+          onChange={(e) => setHistoryActionFilter(e.target.value)}
+          className="company-filter-dropdown"
+        >
+          {uniqueHistoryActions.map(action => (
+            <option key={action} value={action}>{action}</option>
+          ))}
+        </select>
+      </div>
       <table className="history-table table-elevated">
         <thead>
           <tr>
@@ -226,7 +259,7 @@ const History = () => {
           </tr>
         </thead>
         <tbody>
-          {history.map((entry, index) => (
+          {filteredHistory.map((entry, index) => (
             <tr key={index}>
               <td>{entry.timestamp.toDate().toLocaleString()}</td>
               <td>{entry.action}</td>

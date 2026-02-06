@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { collection, onSnapshot, query, orderBy, doc, updateDoc, addDoc, getDocs } from 'firebase/firestore';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db } from '../firebase';
@@ -55,6 +55,30 @@ const DriverDashboard = () => {
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [notification, setNotification] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState(null);
+
+  const normalizeValue = (value) => (value ?? '').toString().trim().toLowerCase();
+
+  const driverVehicleNames = useMemo(() => {
+    if (!loggedInDriver) return [];
+    const normalizedDriverName = normalizeValue(loggedInDriver.name);
+    const fromVehicles = (vehicles || [])
+      .filter(v => normalizeValue(v.driver) === normalizedDriverName)
+      .map(v => v.name)
+      .filter(Boolean);
+    const merged = [loggedInDriver.vehicle, ...fromVehicles].filter(Boolean);
+    return Array.from(new Set(merged));
+  }, [loggedInDriver, vehicles]);
+
+  const isAssignedToDriver = (po) => {
+    if (!loggedInDriver) return false;
+    const normalizedDriverName = normalizeValue(loggedInDriver.name);
+    const assignedDriverName = normalizeValue(po.assignedDriver);
+    if (assignedDriverName && assignedDriverName === normalizedDriverName) return true;
+
+    const assignedTruckName = normalizeValue(po.assignedTruck);
+    const driverVehiclesNormalized = new Set(driverVehicleNames.map(normalizeValue));
+    return assignedTruckName && driverVehiclesNormalized.has(assignedTruckName);
+  };
 
   useEffect(() => {
     const value = theme === 'light' ? 'light' : 'dark';
@@ -125,10 +149,11 @@ const DriverDashboard = () => {
   // Debug: Log POs and filtering
   useEffect(() => {
     if (loggedInDriver && pos.length > 0) {
-      const assignedPOs = pos.filter(po => po.assignedDriver === loggedInDriver.name);
+      const assignedPOs = pos.filter(isAssignedToDriver);
       console.log('=== DRIVER DASHBOARD DEBUG ===');
       console.log('Logged in driver:', loggedInDriver.name);
       console.log('Driver vehicle:', loggedInDriver.vehicle);
+      console.log('Driver vehicle candidates:', driverVehicleNames);
       console.log('Total POs in system:', pos.length);
       console.log('POs with assignedDriver field:', pos.filter(po => po.assignedDriver).length);
       console.log('POs assigned to this driver:', assignedPOs.length);
@@ -138,12 +163,11 @@ const DriverDashboard = () => {
         assignedDriver: po.assignedDriver,
         assignedTruck: po.assignedTruck
       })));
-      console.log('POs that should show for this driver:', pos.filter(po =>
-        po.assignedDriver === loggedInDriver.name ||
-        po.assignedTruck === loggedInDriver.vehicle
-      ).map(po => ({ id: po.id, customId: po.customId, assignedDriver: po.assignedDriver, assignedTruck: po.assignedTruck })));
+      console.log('POs that should show for this driver:', pos
+        .filter(isAssignedToDriver)
+        .map(po => ({ id: po.id, customId: po.customId, assignedDriver: po.assignedDriver, assignedTruck: po.assignedTruck })));
     }
-  }, [loggedInDriver, pos]);
+  }, [loggedInDriver, pos, driverVehicleNames]);
 
   const handleConfirm = async () => {
     let driverDocId = loggedInDriver.id;
@@ -171,7 +195,7 @@ const DriverDashboard = () => {
   };
 
   const validateStatusTransition = (currentStatus, newStatus) => {
-    const assignedPOs = pos.filter(po => po.assignedDriver === loggedInDriver.name || po.assignedTruck === loggedInDriver.vehicle);
+    const assignedPOs = pos.filter(isAssignedToDriver);
     const pendingDeliveries = assignedPOs.filter(po => po.deliveryStatus !== 'done' && po.status !== 'delivered');
 
     // Rule 1: Cannot change from In-transit unless all active deliveries are done
@@ -259,7 +283,7 @@ const DriverDashboard = () => {
       if (status === 'Available') {
         const vehicle = vehicles.find(v => v.name === loggedInDriver.vehicle);
         if (vehicle) {
-          const onHoldPOs = pos.filter(po => po.assignedTruck === loggedInDriver.vehicle && po.status === 'on-hold');
+          const onHoldPOs = pos.filter(po => isAssignedToDriver(po) && po.status === 'on-hold');
           for (const po of onHoldPOs) {
             await updateDoc(doc(db, 'pos', po.id), { status: 'assigned' });
             await addDoc(collection(db, 'history'), {
@@ -273,7 +297,7 @@ const DriverDashboard = () => {
         // When driver goes in-transit, set all assigned POs to in-transit status and deliveryStatus to ongoing
         const vehicle = vehicles.find(v => v.name === loggedInDriver.vehicle);
         if (vehicle) {
-          const assignedPOs = pos.filter(po => po.assignedTruck === loggedInDriver.vehicle && po.deliveryStatus !== 'done');
+          const assignedPOs = pos.filter(po => isAssignedToDriver(po) && po.deliveryStatus !== 'done');
           for (const po of assignedPOs) {
             await updateDoc(doc(db, 'pos', po.id), { status: 'in-transit', deliveryStatus: 'ongoing' });
             await addDoc(collection(db, 'history'), {
@@ -287,7 +311,7 @@ const DriverDashboard = () => {
         // When driver changes from in-transit to another status, reset PO statuses back to assigned
         const vehicle = vehicles.find(v => v.name === loggedInDriver.vehicle);
         if (vehicle) {
-          const inTransitPOs = pos.filter(po => po.assignedTruck === loggedInDriver.vehicle && po.status === 'in-transit');
+          const inTransitPOs = pos.filter(po => isAssignedToDriver(po) && po.status === 'in-transit');
           for (const po of inTransitPOs) {
             await updateDoc(doc(db, 'pos', po.id), { status: 'assigned' });
             await addDoc(collection(db, 'history'), {
@@ -307,7 +331,7 @@ const DriverDashboard = () => {
         previousStatus: loggedInDriver.status,
         newStatus: status,
         vehicle: loggedInDriver.vehicle,
-        assignedPOCount: pos.filter(po => po.assignedDriver === loggedInDriver.name || po.assignedTruck === loggedInDriver.vehicle).length
+        assignedPOCount: pos.filter(isAssignedToDriver).length
       });
 
       // Show success feedback with more context
@@ -652,7 +676,7 @@ const DriverDashboard = () => {
           {pos.length === 0 ? (
             <p>No POs found in the system.</p>
           ) : (() => {
-            const assignedPOs = pos.filter(po => po.assignedDriver === loggedInDriver.name || po.assignedTruck === loggedInDriver.vehicle);
+            const assignedPOs = pos.filter(isAssignedToDriver);
             // Sort POs: incomplete ones first, then completed ones
             const sortedPOs = assignedPOs.sort((a, b) => {
               const aDone = a.deliveryStatus === 'done';
