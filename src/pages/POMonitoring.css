@@ -320,7 +320,6 @@
 /* Kiosk-style modal styles */
 .kiosk-modal {
   max-width: 800px;
-  width: 90%;
   max-height: 90vh;
   overflow-y: auto;
   display: flex;
@@ -1687,11 +1686,10 @@
   width: 16px;
   height: 16px;
   cursor: pointer;
-}
-
-.checkbox-label input[type="checkbox"]:checked {
+  appearance: auto;
   accent-color: #16a34a;
 }
+
 
 .required-asterisk {
   color: #dc2626;

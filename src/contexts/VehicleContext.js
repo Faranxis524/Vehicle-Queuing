@@ -79,8 +79,8 @@ const calculateLoad = (po) => {
     },
     'Jumbo Roll': {
       packaging: [
-        { size: 39016.5, dimensions: { length: 370, width: 285, height: 370 } }, // 12 rolls case (37 × 28.5 × 37 cm)
-        { size: 90956.25, dimensions: { length: 495, width: 375, height: 490 } }  // 16 rolls case (49.5 × 37.5 × 49 cm)
+        { quantity: 12, size: 39016.5, dimensions: { length: 370, width: 285, height: 370 } }, // 12 rolls case (37 × 28.5 × 37 cm)
+        { quantity: 16, size: 90956.25, dimensions: { length: 495, width: 375, height: 490 } }  // 16 rolls case (49.5 × 37.5 × 49 cm)
       ],
       dimensions: { length: 400, width: 300, height: 200 }, // mm per roll (estimated)
       pieceSize: 3648.4 // cm³ per roll (Jumbo Roll Tissue piece/roll volume)
@@ -477,6 +477,55 @@ export const VehicleProvider = ({ children }) => {
         
         // Sort by load (largest first for better bin packing)
         clusterPOs.sort((a, b) => calculateLoad(b) - calculateLoad(a));
+
+        // Consolidation rule: if all POs in this cluster/date can fit in a single vehicle,
+        // assign them together to the smallest eligible vehicle.
+        const totalClusterLoad = clusterPOs.reduce((sum, po) => sum + calculateLoad(po), 0);
+        const consolidationCandidates = workingVehicles.filter(v => {
+          if (v.status !== 'Available') return false;
+          if (!clusterPOs.every(po => checkDimensionsFit(po, v))) return false;
+
+          if (!v.dateClusterMap || Object.keys(v.dateClusterMap).length === 0) {
+            return totalClusterLoad <= v.capacity;
+          }
+
+          const vehicleDates = Object.keys(v.dateClusterMap);
+          if (!vehicleDates.includes(deliveryDate)) return false;
+
+          const vehicleClusterForDate = v.dateClusterMap[deliveryDate];
+          if (vehicleClusterForDate && vehicleClusterForDate !== clusterName) return false;
+
+          const currentLoad = v.currentLoad || 0;
+          return (currentLoad + totalClusterLoad) <= v.capacity;
+        });
+
+        if (consolidationCandidates.length > 0) {
+          consolidationCandidates.sort((a, b) => a.capacity - b.capacity);
+          const bestVehicle = consolidationCandidates[0];
+          const vehicleIndex = workingVehicles.findIndex(wv => wv.id === bestVehicle.id);
+          const currentLoad = workingVehicles[vehicleIndex].currentLoad || 0;
+          const utilizationAfter = (currentLoad + totalClusterLoad) / bestVehicle.capacity;
+
+          workingVehicles[vehicleIndex] = {
+            ...workingVehicles[vehicleIndex],
+            currentLoad: currentLoad + totalClusterLoad,
+            assignedPOs: [...(workingVehicles[vehicleIndex].assignedPOs || []), ...clusterPOs.map(po => po.id)],
+            dateClusterMap: {
+              ...workingVehicles[vehicleIndex].dateClusterMap,
+              [deliveryDate]: clusterName
+            }
+          };
+
+          clusterPOs.forEach(po => {
+            assignmentResults.push({
+              po,
+              vehicle: bestVehicle.name,
+              utilization: utilizationAfter
+            });
+          });
+
+          continue;
+        }
         
         // Try to assign each PO to vehicles following all rules
         for (const po of clusterPOs) {
