@@ -152,7 +152,8 @@ const POMonitoring = () => {
             itemSize = packaging.size;
           }
         } else if (item.pricingType === 'perPiece') {
-          itemSize = product.size;
+          // Use defined per-piece volume from catalog
+          itemSize = product.pieceSize;
         }
         return total + (item.quantity * itemSize);
       }, 0);
@@ -170,7 +171,8 @@ const POMonitoring = () => {
             itemSize = packaging.size;
           }
         } else if (item.pricingType === 'perPiece') {
-          itemSize = product.size;
+          // Use defined per-piece volume from catalog
+          itemSize = product.pieceSize;
         }
         return total + (item.quantity * itemSize);
       }, 0);
@@ -193,7 +195,8 @@ const POMonitoring = () => {
             itemSize = packaging.size;
           }
         } else if (item.pricingType === 'perPiece') {
-          itemSize = product.size;
+          // Use defined per-piece volume from catalog
+          itemSize = product.pieceSize;
         }
         return total + (item.quantity * itemSize);
       }, 0);
@@ -312,13 +315,23 @@ const POMonitoring = () => {
             const poLoad =
               typeof po.load === 'number'
                 ? po.load
-                : (po.products || []).reduce(
-                    (sum, item) =>
-                      sum +
-                      ((item.quantity || 0) *
-                        ((products[item.product]?.size) || 0)),
-                    0
-                  );
+                : (po.products || []).reduce((sum, item) => {
+                    const product = products[item.product];
+                    if (!product) return sum;
+                    let itemSize = 0;
+                    if (item.pricingType === 'perPackage') {
+                      const packaging = product.packaging;
+                      if (Array.isArray(packaging)) {
+                        const selectedPackaging = packaging.find(p => p.quantity === item.packageQuantity) || packaging[0];
+                        itemSize = selectedPackaging?.size || 0;
+                      } else {
+                        itemSize = packaging?.size || 0;
+                      }
+                    } else if (item.pricingType === 'perPiece') {
+                      itemSize = product.pieceSize || 0;
+                    }
+                    return sum + ((item.quantity || 0) * itemSize);
+                  }, 0);
             const d = po.deliveryDate || 'N/A';
             totals[vid].loadByDate[d] = (totals[vid].loadByDate[d] || 0) + poLoad;
             totals[vid].assigned.push(po.id);
@@ -561,7 +574,7 @@ const POMonitoring = () => {
         }
       } else if (item.pricingType === 'perPiece') {
         // Use individual piece volume
-        itemSize = product.size;
+        itemSize = product.pieceSize || 0;
       }
 
       return total + (item.quantity * itemSize);
