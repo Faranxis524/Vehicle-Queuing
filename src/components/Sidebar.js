@@ -43,7 +43,6 @@ const Sidebar = () => {
         <ul>
           <li><Link to="/po-monitoring" className={location.pathname === '/po-monitoring' ? 'active' : ''}>PO Monitoring</Link></li>
           <li><Link to="/vehicle-monitoring" className={location.pathname === '/vehicle-monitoring' ? 'active' : ''}>Vehicle Monitoring</Link></li>
-          <li><Link to="/history" className={location.pathname === '/history' ? 'active' : ''}>History</Link></li>
           <li><Link to="/driver-info" className={location.pathname === '/driver-info' ? 'active' : ''}>Driver Info</Link></li>
         </ul>
       </div>

@@ -7,7 +7,6 @@ import { VehicleProvider } from './contexts/VehicleContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import POMonitoring from './pages/POMonitoring';
 import VehicleMonitoring from './pages/VehicleMonitoring';
-import History from './pages/History';
 import DriverInfo from './pages/DriverInfo';
 
 import DriverDashboard from './pages/DriverDashboard';
@@ -77,7 +76,6 @@ function App() {
               }>
                 <Route path="/po-monitoring" element={<POMonitoring />} />
                 <Route path="/vehicle-monitoring" element={<VehicleMonitoring />} />
-                <Route path="/history" element={<History />} />
                 <Route path="/driver-info" element={<DriverInfo />} />
               </Route>
             </Routes>
